@@ -1,0 +1,29 @@
+
+Group is
+    $/basis.cm
+
+    recursive.fun
+
+    (* hkt.sml *)
+    (* pair-hkt.sml *)
+
+    functor/functor.sig
+
+    (* monad/monad.sig *)
+    monad/free.sig
+    monad/free.fun
+    (* monad/either.fun *)
+
+    (* comonad/comonad.sig *)
+    comonad/free.sig
+    comonad/free.fun
+    (* comonad/pair.fun *)
+
+    (* schemes.sml *)
+
+    (* functor.sig *)
+    (* fix.fun *)
+    (* cofree.fun *)
+    (* free.fun *)
+    (* recursion-schemes.sml *)
+    (* listf.sml *)
