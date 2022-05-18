@@ -1,0 +1,15 @@
+
+Group is
+    $/basis.cm
+    $/smlnj-lib.cm
+
+    compat-smlnj.sml
+
+    sparse-vector.sig
+    sparse-vector.sml
+
+    eq-map.sig
+    vector-map.fun
+
+    hash-map.sig
+    hamt.fun

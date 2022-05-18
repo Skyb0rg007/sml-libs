@@ -1,0 +1,30 @@
+
+local
+    $(SML_LIB)/basis/basis.mlb
+    $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
+
+    local
+        $(SML_LIB)/basis/mlton.mlb
+    in
+        compat-mlton.sml
+    end
+
+    sparse-vector.sig
+    eq-map.sig
+    ann "allowVectorExps true" in
+        sparse-vector.sml
+    end
+    ann "allowVectorPats true" "allowVectorExps true" in
+        vector-map.fun
+    end
+
+    hash-map.sig
+    hamt.fun
+in
+    signature SPARSE_VECTOR
+    structure SparseVector
+    signature EQ_MAP
+    functor VectorMapFn
+    signature HASH_MAP
+    functor HAMTFn
+end
