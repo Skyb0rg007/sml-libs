@@ -1,4 +1,7 @@
 
 Group is
     $/basis.cm
+    finger-tree.sig
     finger-tree.fun
+    lazy.sig
+    lazy.sml
