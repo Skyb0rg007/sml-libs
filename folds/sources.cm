@@ -1,0 +1,10 @@
+
+Library
+    signature FOLDL
+    structure Foldl
+is
+    $/basis.cm
+
+    foldl.sig
+    foldl.sml
+    ordset.sml
