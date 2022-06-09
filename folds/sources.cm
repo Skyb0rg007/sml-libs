@@ -7,4 +7,6 @@ is
 
     foldl.sig
     foldl.sml
+
+    ordset.sig
     ordset.sml

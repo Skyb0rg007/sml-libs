@@ -1,14 +1,15 @@
 
-Library
+local
+    $(SML_LIB)/basis/basis.mlb
+    lazy.sig
+    lazy.sml
+    finger-tree.sig
+    finger-tree.fun
+    seq.sml
+in
     signature MONOID
     signature FINGER_TREE_STRUCTS
     signature FINGER_TREE
     functor FingerTree
     structure Seq
-is
-    $/basis.cm
-    finger-tree.sig
-    finger-tree.fun
-    lazy.sig
-    lazy.sml
-    seq.sml
+end

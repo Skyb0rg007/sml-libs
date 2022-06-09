@@ -1,8 +1,14 @@
 
-functor FingerTree(S: FINGER_TREE_STRUCTS) :> FINGER_TREE =
+functor FingerTree(S: FINGER_TREE_STRUCTS)
+(* :> FINGER_TREE *)
+(*    where type 'a Item.t = 'a S.Item.t *)
+(*      and type Measure.t = S.Measure.t *)
+     =
 struct
 
 open S
+
+structure Lazy = Lazy
 
 infix <+>
 val op <+> = Measure.+
@@ -25,6 +31,8 @@ datatype 'a t =
    Empty
  | Single of 'a elem
  | Deep of Measure.t Lazy.t * 'a elem digit * 'a t Lazy.t * 'a elem digit
+
+exception InvariantError of string
 
 fun measureNode (Node2 (v, _, _)) = v
   | measureNode (Node3 (v, _, _, _)) = v
@@ -224,8 +232,23 @@ val _: (Measure.t * 'a Item.t * Measure.t -> 'b Item.t) -> 'a t -> 'b t = mapWit
 (* Folding functions *)
 
 local
+   fun foldlDigit f z (One a) = f (a, z)
+     | foldlDigit f z (Two (a, b)) = f (b, f (a, z))
+     | foldlDigit f z (Three (a, b, c)) = f (c, f (b, f (a, z)))
+     | foldlDigit f z (Four (a, b, c, d)) = f (d, f (c, f (b, f (a, z))))
+
+   fun foldlNode f z (Node2 (_, a, b)) = f (b, f (a, z))
+     | foldlNode f z (Node3 (_, a, b, c)) = f (c, f (b, f (a, z)))
+
+   fun foldlTree _ z Empty = z
+     | foldlTree f z (Single x) = f (x, z)
+     | foldlTree f z (Deep (_, pr, m, sf)) =
+      foldlDigit f (foldlTree f (foldlDigit f z pr) (Lazy.force m)) sf
+
+   fun liftElem f (Item x, z) = f (x, z)
+     | liftElem f (Node n, z) = foldlNode (liftElem f) z n
 in
-   fun foldl _ = raise Fail "NYI"
+   fun foldl f z t = foldlTree (liftElem f) z t
 end
 
 local
@@ -289,8 +312,23 @@ in
 end
 
 local
+   fun foldrDigit f z (One a) = f (a, z)
+     | foldrDigit f z (Two (a, b)) = f (a, f (b, z))
+     | foldrDigit f z (Three (a, b, c)) = f (a, f (b, f (c, z)))
+     | foldrDigit f z (Four (a, b, c, d)) = f (a, f (b, f (c, f (d, z))))
+
+   fun foldrNode f z (Node2 (_, a, b)) = f (a, f (b, z))
+     | foldrNode f z (Node3 (_, a, b, c)) = f (a, f (b, f (c, z)))
+
+   fun foldrTree _ z Empty = z
+     | foldrTree f z (Single x) = f (x, z)
+     | foldrTree f z (Deep (_, pr, m, sf)) =
+      foldrDigit f (foldrTree f (foldrDigit f z sf) (Lazy.force m)) pr
+
+   fun liftElem f (Item x, z) = f (x, z)
+     | liftElem f (Node n, z) = foldrNode (liftElem f) z n
 in
-   fun foldr _ = raise Fail "NYI"
+   fun foldr f z t = foldrTree (liftElem f) z t
 end
 
 local
@@ -314,7 +352,7 @@ fun singleton x = Single (Item x)
 fun consDigit (a, One b) = Two (a, b)
   | consDigit (a, Two (b, c)) = Three (a, b, c)
   | consDigit (a, Three (b, c, d)) = Four (a, b, c, d)
-  | consDigit (_, Four _) = raise Fail "consDigit: Four"
+  | consDigit (_, Four _) = raise InvariantError "consDigit"
 
 fun consTree (a, Empty) = Single a
   | consTree (a, Single b) = deep (One a, Lazy.eager Empty, One b)
@@ -334,7 +372,7 @@ fun cons (a, t) = consTree (Item a, t)
 fun snocDigit (One a, b) = Two (a, b)
   | snocDigit (Two (a, b), c) = Three (a, b, c)
   | snocDigit (Three (a, b, c), d) = Four (a, b, c, d)
-  | snocDigit (Four _, _) = raise Fail "snocDigit: Four"
+  | snocDigit (Four _, _) = raise InvariantError "snocDigit"
 
 fun snocTree (Empty, a) = Single a
   | snocTree (Single a, b) = deep (One a, Lazy.eager Empty, One b)
@@ -367,7 +405,7 @@ fun headDigit (One a) = a
   | headDigit (Three (a, _, _)) = a
   | headDigit (Four (a, _, _, _)) = a
 
-fun tailDigit (One _) = raise Fail "tailDigit: One"
+fun tailDigit (One _) = raise InvariantError "tailDigit"
   | tailDigit (Two (_, b)) = One b
   | tailDigit (Three (_, b, c)) = Two (b, c)
   | tailDigit (Four (_, b, c, d)) = Three (b, c, d)
@@ -380,7 +418,7 @@ fun rotL (m, sf) =
                nodeToDigit a,
                m',
                sf)
-    | SOME (Item _, _) => raise Fail "rotL: Item"
+    | SOME (Item _, _) => raise InvariantError "rotL"
 
 and viewlTree Empty = NONE
   | viewlTree (Single x) = SOME (x, Lazy.eager Empty)
@@ -391,14 +429,14 @@ fun viewl t =
    case viewlTree t of
       NONE => NONE
     | SOME (Item x, t') => SOME (x, t')
-    | SOME (Node _, _) => raise Fail "viewl: Node"
+    | SOME (Node _, _) => raise InvariantError "viewl"
 
 fun lastDigit (One a) = a
   | lastDigit (Two (_, b)) = b
   | lastDigit (Three (_, _, c)) = c
   | lastDigit (Four (_, _, _, d)) = d
 
-fun initDigit (One _) = raise Fail "tailDigit: One"
+fun initDigit (One _) = raise InvariantError "tailDigit"
   | initDigit (Two (a, _)) = One a
   | initDigit (Three (a, b, _)) = Two (a, b)
   | initDigit (Four (a, b, c, _)) = Three (a, b, c)
@@ -411,7 +449,7 @@ fun rotR (pr, m) =
                pr,
                m',
                nodeToDigit a)
-    | SOME (_, Item _) => raise Fail "rotR: Item"
+    | SOME (_, Item _) => raise InvariantError "rotR"
 
 and viewrTree Empty = NONE
   | viewrTree (Single x) = SOME (Lazy.eager Empty, x)
@@ -422,7 +460,7 @@ fun viewr t =
    case viewrTree t of
       NONE => NONE
     | SOME (t', Item x) => SOME (t', x)
-    | SOME (_, Node _) => raise Fail "viewr: Node"
+    | SOME (_, Node _) => raise InvariantError "viewr"
 
 (* Append *)
 
@@ -692,7 +730,7 @@ fun searchNode p (vl, Node2 (_, a, b), vr) =
       else (SOME (Two (a, b)), c, NONE)
    end
 
-fun searchTree _ (_, Empty, _) = raise Fail "searchTree: Empty"
+fun searchTree _ (_, Empty, _) = raise InvariantError "searchTree"
   | searchTree _ (_, Single x, _) = (Empty, x, Empty)
   | searchTree p (vl, Deep (_, pr, m, sf), vr) =
    let
@@ -711,7 +749,7 @@ fun searchTree _ (_, Empty, _) = raise Fail "searchTree: Empty"
       else if p (vlpm, vsr)
          then 
             case searchTree p (vlp, m, vsr) of
-               (_, Item _, _) => raise Fail "searchTree: Item"
+               (_, Item _, _) => raise InvariantError "searchTree"
              | (ml, Node xs, mr) =>
                   case searchNode p (vlp <+> measure ml, xs, measure mr <+> vsr) of
                      (l, x, r) => (deepR (pr, ml, l), x, deepL (r, mr, sf))
@@ -734,7 +772,7 @@ fun search (p: Measure.t * Measure.t -> bool) (t: 'a t): 'a search_result =
        | (false, true) =>
             case searchTree p (Measure.zero, t, Measure.zero) of
                (l, Item x, r) => Position (l, x, r)
-             | (_, Node _, _) => raise Fail "search: Node"
+             | (_, Node _, _) => raise InvariantError "search"
    end
 
 fun splitDigit _ (vl, One a) = (NONE, a, NONE)
@@ -792,7 +830,7 @@ fun splitNode p (vl, Node2 (_, a, b)) =
       else (SOME (Two (a, b)), c, NONE)
    end
 
-fun splitTree _ (_, Empty) = raise Fail "searchTree: Empty"
+fun splitTree _ (_, Empty) = raise InvariantError "splitTree"
   | splitTree _ (_, Single x) = (Empty, x, Empty)
   | splitTree p (vl, Deep (_, pr, m, sf)) =
    let
@@ -808,7 +846,7 @@ fun splitTree _ (_, Empty) = raise Fail "searchTree: Empty"
       else if p vlpm
          then 
             case splitTree p (vlp, m) of
-               (_, Item _, _) => raise Fail "searchTree: Item"
+               (_, Item _, _) => raise InvariantError "splitTree"
              | (ml, Node xs, mr) =>
                   case splitNode p (vlp <+> measure ml, xs) of
                      (l, x, r) => (deepR (pr, ml, l), x, deepL (r, mr, sf))
@@ -843,22 +881,110 @@ fun reverse Empty = Empty
   | reverse (Single x) = Single x
   | reverse (Deep (_, pr, m, sf)) = deep (reverseDigit sf, Lazy.map reverse m, reverseDigit pr)
 
+(* Debugging *)
+
+(* local *)
+   (* structure PP = CharBufferPP *)
+
+   (* type label = { width: int, numSub: int, label: string } *)
+
+   (* datatype tree = TNode of label * tree list *)
+
+   (* val gap = 2 *)
+
+   (* fun treeWidth (TNode ({width, ...}, _)) = width *)
+
+   (* fun forestWidth [] = 0 *)
+   (*   | forestWidth [t] = treeWidth t *)
+   (*   | forestWidth (t :: ts) = treeWidth t + gap + forestWidth ts *)
+
+   (* fun stringToTree s = *)
+   (*    TNode ({width = String.size s, numSub = 0, label = s}, []) *)
+
+   (* fun digitToTree tot d = *)
+   (*    let *)
+   (*       val xs = *)
+   (*          case d of *)
+   (*             One a => [a] *)
+   (*           | Two (a, b) => [a, b] *)
+   (*           | Three (a, b, c) => [a, b, c] *)
+   (*           | Four (a, b, c, d) => [a, b, c, d] *)
+
+   (*       val xs' = List.map tot xs *)
+   (*       val lbl = "Digit" *)
+   (*       val w = Int.max (String.size lbl, forestWidth xs') *)
+   (*    in *)
+   (*       TNode ({width = w, numSub = List.length xs, label = lbl}, xs') *)
+   (*    end *)
+
+   (* fun nodeToTree tot n = *)
+   (*    let *)
+   (*       val xs = *)
+   (*          case n of *)
+   (*             Node2 (_, a, b) => [a, b] *)
+   (*           | Node3 (_, a, b, c) => [a, b, c] *)
+
+   (*       val xs' = List.map tot xs *)
+   (*       val lbl = "Node" *)
+   (*       val w = Int.max (String.size lbl, forestWidth xs') *)
+   (*    in *)
+   (*       TNode ({width = w, numSub = List.length xs, label = lbl}, xs') *)
+   (*    end *)
+
+   (* fun elemToTree tot (Item e) = tot e *)
+   (*   | elemToTree tot (Node n) = nodeToTree (elemToTree tot) n *)
+
+   (* fun treeToTree _ Empty = stringToTree "*" *)
+   (*   | treeToTree tot (Single x) = elemToTree tot x *)
+   (*   | treeToTree tot (Deep (_, pr, m, sf)) = *)
+   (*    let *)
+   (*       val pr' = digitToTree (elemToTree tot) pr *)
+   (*       val sf' = digitToTree (elemToTree tot) sf *)
+   (*       val m' = *)
+   (*          case Lazy.nudge m of *)
+   (*             NONE => stringToTree "-" *)
+   (*           | SOME m => treeToTree tot m *)
+
+   (*       val xs = [pr', m', sf'] *)
+   (*       val lbl = "" *)
+   (*       val w = forestWidth xs *)
+   (*    in *)
+   (*       TNode ({width = w, numSub = List.length xs, label = lbl}, xs) *)
+   (*    end *)
+
+   (* fun ppT s (TNode ({width, numSub, label}, ts)) = *)
+   (*    let *)
+   (*    in *)
+   (*       PP.openHBox s *)
+   (*       ; PP.string s label *)
+   (*    end *)
+
+   (* fun treeShow tos t = *)
+   (*    let *)
+   (*       val buf = CharBuffer.new 10 *)
+   (*       val strm = PP.openBuf { dst = buf, wid = 80 } *)
+   (*    in *)
+   (*       ppT strm (treeToTree (stringToTree o tos) t) *)
+   (*       ; PP.flushStream strm *)
+   (*       ; CharBuffer.contents buf *)
+   (*    end *)
+
+
+   (* fun pp s Empty = PP.string s "Empty" *)
+   (*   | pp s (Single x) = PP.string s "Single" *)
+   (*   | pp s (Deep (v, pr, m, sf)) = PP.string s "Deep" *)
+(* (1* in *1) *)
+   (* fun debugShow tos t = *)
+   (*    let *)
+   (*       val buf = CharBuffer.new 10 *)
+   (*       val strm = PP.openBuf { dst = buf, wid = 80 } *)
+   (*    in *)
+   (*       pp strm t *)
+   (*       ; PP.flushStream strm *)
+   (*       ; CharBuffer.contents buf *)
+   (*    end *)
+(* end *)
+
 end
-
-structure Seq = FingerTree(
-   struct
-      structure Measure =
-         struct
-            type t = int
-            val op + = Int.+
-            val zero = 0
-         end
-
-      structure Item =
-         struct
-            type 'a t = 'a
-            fun measure _ = 1
-         end
-   end)
 
 (* vim: set ft=sml ts=3 sw=3 tw=0: *)

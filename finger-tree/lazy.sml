@@ -21,9 +21,10 @@ fun delay th = ref (Lazy th)
 
 fun eager x = ref (Strict x)
 
-fun fromSusp s = delay (fn () => SMLofNJ.Susp.force s)
-
 fun map f r = delay (fn () => f (force r))
+
+fun nudge (ref (Strict x)) = SOME x
+  | nudge _ = NONE
 
 end
 

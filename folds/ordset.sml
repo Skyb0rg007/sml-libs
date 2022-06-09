@@ -1,23 +1,10 @@
 
-
-structure OrdSet:
-sig
-
-type 'a t
-
-val empty: ('a * 'a -> order) -> 'a t
-val insert: 'a t * 'a -> 'a t
-val member: 'a t * 'a -> bool
-
-end =
+(* Simple binary set data structure
+ * Implementation copied from Haskell's Data.Map *)
+structure OrdSet :> ORD_SET =
 struct
 
-structure Tree:
-   sig
-      datatype 'a t = Tip | Bin of int * 'a t * 'a * 'a t
-
-      val balance: 'a t * 'a * 'a t -> 'a t
-   end =
+structure Tree =
    struct
       datatype 'a t = Tip | Bin of int * 'a t * 'a * 'a t
 
@@ -98,4 +85,5 @@ fun member (Set (cmp, t), x) =
    end
 
 end
+
 (* vim: set ft=sml tw=0 sw=3 ts=3: *)

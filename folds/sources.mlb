@@ -1,0 +1,15 @@
+
+local
+    $(SML_LIB)/basis/basis.mlb
+    ordset.sig
+    ordset.sml
+    either.sig
+    either.sml
+    foldl.sig
+    foldl.sml
+in
+    signature EITHER
+    structure Either
+    signature FOLDL
+    structure Foldl
+end
