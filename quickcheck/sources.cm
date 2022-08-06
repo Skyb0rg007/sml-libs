@@ -1,4 +1,21 @@
 
 Group is
     $/basis.cm
-    ../splitmix/sources.cm
+    $/smlnj-lib.cm
+
+    splitmix.sig
+    splitmix.sml
+    result.sig
+    result.sml
+
+    seq.sig
+    seq.sml
+    shrink.sig
+    shrink.fun
+    tree.sig
+    tree.sml
+    gen.sig
+    gen.sml
+
+    arbitrary.sig
+    arbitrary.sml

@@ -8,6 +8,7 @@ local
     in
         compat-mlton.sml
     end
+    util.sml
 
     sparse-vector.sig
     eq-map.sig

@@ -6,3 +6,8 @@ Group is
     sexp.sig
     sexp.sml
     sexp-print.sml
+
+    sexp-lexer.sml
+
+    numeric-tower.sig
+    numeric-tower.sml

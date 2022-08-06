@@ -1,7 +1,7 @@
 
 structure SparseVector :> SPARSE_VECTOR =
 struct
-   open Compat
+   open Util
    structure W = Word32
    structure V = Vector
 
@@ -10,47 +10,9 @@ struct
       data: 'a V.vector
    }
 
-   (* Count trailing zeros *)
-   fun ctz 0w0 = 0w32
-     | ctz w =
-      let
-        fun go (mask, set, w, n) =
-           if W.andb (w, mask) = 0w0
-              then (W.>> (w, set), n + set)
-           else (w, n)
-
-        val (w, n) = (w, 0w0)
-        val (w, n) = go (0wx0000ffff, 0w16, w, n)
-        val (w, n) = go (0wx000000ff, 0w8, w, n)
-        val (w, n) = go (0wx0000000f, 0w4, w, n)
-        val (w, n) = go (0wx00000003, 0w2, w, n)
-        val (w, n) = go (0wx00000001, 0w1, w, n)
-     in
-        n
-     end
-
-   (* Count leading zeros *)
-   fun clz 0w0 = 0w32
-     | clz w =
-      let
-        fun go (mask, set, w, n) =
-           if W.andb (w, mask) = 0w0
-              then (W.<< (w, set), n + set)
-           else (w, n)
-
-        val n = 0w0
-        val (w, n) = go (0wxffff0000, 0w16, w, n)
-        val (w, n) = go (0wxff000000, 0w8, w, n)
-        val (w, n) = go (0wxf0000000, 0w4, w, n)
-        val (w, n) = go (0wxc0000000, 0w2, w, n)
-        val (w, n) = go (0wx80000000, 0w1, w, n)
-     in
-        n
-     end
-
    (* Convert from an index mask (1 << idx) to the backing vector index *)
    fun sparseIndex (mask, idxMask) =
-      Compat.Word32.popCount (W.andb (mask, idxMask - 0w1))
+      W.popCount (W.andb (mask, idxMask - 0w1))
 
    val maxLen = 32
 
@@ -79,23 +41,17 @@ struct
          in
             if W.andb (mask, idxMask) = 0w0
                then
-                  let
-                     val len' = V.length data + 1
-                     val mask' = W.orb (mask, idxMask)
-                     fun gen j =
-                        case Int.compare (j, si) of
-                           LESS => Vector.sub (data, j)
-                         | EQUAL => x
-                         | GREATER => Vector.sub (data, j - 1)
-                  in
-                     (T {mask = mask', data = V.tabulate (len', gen)}, NONE)
-                  end
+                  (T {mask = W.orb (mask, idxMask),
+                      data = V.insert (data, si, x)},
+                   NONE)
             else
                let
                   val old = V.sub (data, si)
                   val new = f (i, old, x)
                in
-                  (T {mask = mask, data = V.update (data, si, new)}, SOME old)
+                  (T {mask = mask,
+                      data = V.update (data, si, new)},
+                   SOME old)
                end
          end
 
@@ -129,11 +85,7 @@ struct
                    | NONE =>
                         let
                            val mask' = W.andb (mask, W.notb idxMask)
-                           fun gen j =
-                              if j < si
-                                 then V.sub (data, j)
-                              else V.sub (data, j + 1)
-                           val data' = V.tabulate (V.length data - 1, gen)
+                           val data' = V.remove (data, si)
                         in
                            (T {mask = mask', data = data'}, SOME old)
                         end
@@ -176,13 +128,8 @@ struct
             else
                let
                   val si = sparseIndex (mask, idxMask)
-                  val len = V.length data
-                  fun gen j =
-                     if j < si
-                        then Vector.sub (data, j)
-                     else Vector.sub (data, j + 1)
                   val mask' = W.andb (mask, W.notb idxMask)
-                  val data' = V.tabulate (len - 1, gen)
+                  val data' = V.remove (data, si)
                in
                   SOME (T {mask = mask', data = data'}, Vector.sub (data, si))
                end
@@ -207,15 +154,10 @@ struct
                    | SOME new =>
                         let
                            val si = sparseIndex (mask, idxMask)
-                           val len' = V.length data + 1
                            val mask' = W.orb (mask, idxMask)
-                           fun gen j =
-                              case Int.compare (j, si) of
-                                 LESS => V.sub (data, j)
-                               | EQUAL => new
-                               | GREATER => V.sub (data, j - 1)
+                           val data' = V.insert (data, si, new)
                         in
-                           T {mask = mask', data = V.tabulate (len', gen)}
+                           T {mask = mask', data = data'}
                         end
             else
                let
@@ -227,14 +169,9 @@ struct
                         T {mask = mask, data = V.update (data, si, new)}
                    | NONE =>
                         let
-                           val len' = V.length data - 1
                            val mask' = W.andb (mask, W.notb idxMask)
-                           fun gen j =
-                              if j < si
-                                 then V.sub (data, j)
-                              else V.sub (data, j + 1)
                         in
-                           T {mask = mask', data = V.tabulate (len', gen)}
+                           T {mask = mask', data = V.remove (data, si)}
                         end
                end
          end
@@ -293,11 +230,10 @@ struct
          fun go (0w0, _) = true
            | go (mask, si) =
             let
-               val i = ctz mask
-               val mask' = W.andb (mask, W.notb (W.<< (0w1, i)))
+               val i = W.trailingZeros mask
+               val mask' = W.andb (mask, W.notb (W.<< (0w1, Word.fromInt i)))
             in
-               f (Word.toInt i, V.sub (data, si))
-               andalso go (mask', si + 1)
+               f (i, V.sub (data, si)) andalso go (mask', si + 1)
             end
       in
          go (mask, 0)
@@ -308,11 +244,10 @@ struct
          fun go (0w0, _) = false
            | go (mask, si) =
             let
-               val i = ctz mask
-               val mask' = W.andb (mask, W.notb (W.<< (0w1, i)))
+               val i = W.trailingZeros mask
+               val mask' = W.andb (mask, W.notb (W.<< (0w1, Word.fromInt i)))
             in
-               f (Word.toInt i, V.sub (data, si))
-               orelse go (mask', si + 1)
+               f (i, V.sub (data, si)) orelse go (mask', si + 1)
             end
       in
          go (mask, 0)
@@ -323,10 +258,10 @@ struct
          fun go (0w0, _, acc) = acc
            | go (mask, si, acc) =
             let
-               val i = ctz mask
-               val mask' = W.andb (mask, W.notb (W.<< (0w1, i)))
+               val i = W.trailingZeros mask
+               val mask' = W.andb (mask, W.notb (W.<< (0w1, Word.fromInt i)))
             in
-               go (mask', si + 1, f (Word.toInt i, V.sub (data, si), acc))
+               go (mask', si + 1, f (i, V.sub (data, si), acc))
             end
       in
          go (mask, 0, z)
@@ -337,10 +272,10 @@ struct
          fun go (0w0, _, acc) = acc
            | go (mask, si, acc) =
             let
-               val i = 0w31 - clz mask
-               val mask' = W.andb (mask, W.notb (W.<< (0w1, i)))
+               val i = 31 - W.leadingZeros mask
+               val mask' = W.andb (mask, W.notb (W.<< (0w1, Word.fromInt i)))
             in
-               go (mask', si - 1, f (Word.toInt i, V.sub (data, si), acc))
+               go (mask', si - 1, f (i, V.sub (data, si), acc))
             end
       in
          go (mask, V.length data - 1, z)
@@ -350,17 +285,25 @@ struct
       let
          fun go (si, mask) =
             let
-               val i = ctz mask
-               val mask' = W.andb (mask, W.notb (W.<< (0w1, i)))
+               val i = W.trailingZeros mask
+               val mask' = W.andb (mask, W.notb (W.<< (0w1, Word.fromInt i)))
             in
-               (f (Word.toInt i, V.sub (data, si)), mask')
+               (f (i, V.sub (data, si)), mask')
             end
-         val (d, mask') = Compat.Vector.unfoldi (V.length data, mask, go)
+         val (d, mask') = V.unfoldi (V.length data, mask, go)
       in
          if mask' <> 0w0
             then raise Fail "SparseVector.mapi: wrong length"
          else ()
          ; T {mask = mask, data = d}
+      end
+
+   fun mapAccuml f acc (T {data, mask}) =
+      let
+         fun go (i, acc) = f (V.sub (data, i), acc)
+         val (data', acc') = V.unfoldi (V.length data, acc, go)
+      in
+         (acc', T {data = data', mask = mask})
       end
 
    fun mapPartiali f (T {data, mask}) =
@@ -398,14 +341,14 @@ struct
    fun listKeys sv = foldri (fn (k, _, acc) => k :: acc) [] sv
 
    fun findMin (T {data, mask}) =
-      case ctz mask of
-         0w32 => NONE
-       | i => SOME (Word.toInt i, V.sub (data, 0))
+      case W.trailingZeros mask of
+         32 => NONE
+       | i => SOME (i, V.sub (data, 0))
 
    fun findMax (T {data, mask}) =
-      case clz mask of
-         0w32 => NONE
-       | i => SOME (31 - Word.toInt i, V.sub (data, V.length data - 1))
+      case W.leadingZeros mask of
+         32 => NONE
+       | i => SOME (31 - i, V.sub (data, V.length data - 1))
 
    fun lookupMin sv =
       case findMin sv of
@@ -420,8 +363,8 @@ struct
    fun deleteMin (sv as T {mask = 0w0, ...}) = sv
      | deleteMin (T {data, mask}) =
       let
-         val idx = ctz mask
-         val mask' = W.andb (mask, W.notb (W.<< (0w1, idx)))
+         val idx = W.trailingZeros mask
+         val mask' = W.andb (mask, W.notb (W.<< (0w1, Word.fromInt idx)))
          fun gen i = V.sub (data, i + 1)
       in
          T {data = V.tabulate (V.length data - 1, gen), mask = mask'}
@@ -430,8 +373,8 @@ struct
    fun deleteMax (sv as T {mask = 0w0, ...}) = sv
      | deleteMax (T {data, mask}) =
       let
-         val idx = 0w31 - clz mask
-         val mask' = W.andb (mask, W.notb (W.<< (0w1, idx)))
+         val idx = 31 - W.leadingZeros mask
+         val mask' = W.andb (mask, W.notb (W.<< (0w1, Word.fromInt idx)))
          fun gen i = V.sub (data, i)
       in
          T {data = V.tabulate (V.length data - 1, gen), mask = mask'}
@@ -464,9 +407,8 @@ struct
          fun go (_, _, 0w0) = raise Fail "SparseVector.unionWithi: length too short"
            | go (i, j, b) =
             let
-               val idx' = ctz b
-               val idx = Word.toInt idx'
-               val m = W.<< (0w1, idx')
+               val idx = W.trailingZeros b
+               val m = W.<< (0w1, Word.fromInt idx)
                val b' = W.andb (b, W.notb m)
             in
                if W.andb (m, W.andb (m1, m2)) <> 0w0
@@ -477,9 +419,9 @@ struct
             end
 
          val both = W.orb (m1, m2)
-         val len = Compat.Word32.popCount both
+         val len = W.popCount both
 
-         val (v, (_, _, b)) = Compat.Vector.unfoldi (len, (0, 0, both), go o #2)
+         val (v, (_, _, b)) = V.unfoldi (len, (0, 0, both), go o #2)
       in
          if b <> 0w0
             then raise Fail "SparseVector.unionWithi: length too long"
@@ -503,12 +445,11 @@ struct
 
    fun collate cmp (sv1 as T {mask = m1, ...}, sv2 as T {mask = m2, ...}) =
       let
-         val max1 = Word.toInt (0w32 - clz m1)
-         val max2 = Word.toInt (0w32 - clz m2)
-         val min = Word.toInt (ctz (W.orb (m1, m2)))
+         val max1 = 32 - W.leadingZeros m1
+         val max2 = 32 - W.leadingZeros m2
+         val min = W.trailingZeros (W.orb (m1, m2))
 
          fun go i =
-            (print ("i = " ^ Int.toString i ^ "\n");
             case (i >= max1, i >= max2) of
                (true, true) => EQUAL
              | (true, false) => LESS
@@ -522,7 +463,6 @@ struct
                         case cmp (x, y) of
                            EQUAL => go (i + 1)
                          | order => order
-                         )
       in
          go min
       end

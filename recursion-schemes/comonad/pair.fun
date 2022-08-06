@@ -10,9 +10,8 @@ sig
   val duplicate: 'a t -> 'a t t
 end
 
-functor PairComonad(type t) :> PAIR_COMONAD where type left = t =
+functor PairComonad(type t) :> PAIR_COMONAD =
 struct
-  type left = t
   type 'a t = t * 'a
 
   fun map f (x, y) = (x, f y)

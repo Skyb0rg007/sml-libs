@@ -1,5 +1,5 @@
 
-structure SplitMix :> SPLITMIX =
+structure SplitMix =
 struct
    infix << >> andb orb xorb
    val op << = Word64.<<
@@ -15,6 +15,15 @@ struct
    val w64ToInf = IntInf.fromLarge o Word64.toLargeInt
    val w64ToI64 = Int64.fromLarge o Word64.toLargeIntX
    val infToW64 = Word64.fromLargeInt o IntInf.toLarge
+
+   fun popCount w =
+      let
+         val w = w - ((w >> 0w1) andb 0wx5555555555555555)
+         val w = (w andb 0wx3333333333333333) + ((w >> 0w2) andb 0wx3333333333333333)
+         val w = (w + (w >> 0w4)) andb 0wx0f0f0f0f0f0f0f0f
+      in
+         Word64.toInt ((w * 0wx0101010101010101) >> 0w56)
+      end
 
    fun mix64 w =
       let
@@ -35,7 +44,7 @@ struct
    fun mixGamma w =
       let
          val w = mix64variant13 w orb 0w1
-         val n = Word64.popCount (w xorb (w >> 0w1))
+         val n = popCount (w xorb (w >> 0w1))
       in
          if n >= 24
             then w

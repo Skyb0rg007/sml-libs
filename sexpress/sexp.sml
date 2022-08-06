@@ -1,15 +1,86 @@
 
 structure SExp =
 struct
+   structure Num =
+   struct
+      datatype t =
+         FIX of int
+       | BIG of IntInf.int
+       | FLO of real
+       | RAT of t * t
+       | CPX of t * t
+
+      fun toString (FIX n) =
+         if n < 0
+            then "-" ^ Int.toString (~n)
+         else Int.toString n
+        | toString (BIG n) =
+         if n < 0
+            then "-" ^ IntInf.toString (~n)
+         else IntInf.toString n
+        | toString (FLO n) =
+         if Real.isNan n
+            then "+nan.0"
+         else
+            (case (Real.isFinite n, n < 0.0) of
+                (true, true) => "-" ^ Real.toString (~n)
+              | (true, false) => Real.toString n
+              | (false, true) => "-inf.0"
+              | (false, false) => "+inf.0")
+        | toString (RAT (n, d)) = toString n ^ "/" ^ toString d
+        | toString (CPX (a, b)) =
+         let
+            val bstr = toString b
+         in
+            if String.sub (bstr, 0) = #"-"
+               then toString a ^ bstr ^ "i"
+            else toString a ^ "+" ^ bstr ^ "i"
+         end
+
+      val bignum =
+         case (Int.minInt, Int.maxInt) of
+            (SOME _, NONE) => raise Fail "Int has minimum value but no maximum"
+          | (NONE, SOME _) => raise Fail "Int has maximum value but no minimum"
+          | (SOME min, SOME max) =>
+               let
+                  val min = IntInf.fromInt min
+                  val max = IntInf.fromInt max
+                  fun go n =
+                     if min <= n andalso n <= max
+                        then FIX (IntInf.toInt n)
+                     else BIG n
+               in
+                  go
+               end
+          | (NONE, NONE) => fn n => FIX (IntInf.toInt n)
+
+      fun exact (FIX _) = true
+        | exact (BIG _) = true
+        | exact (FLO _) = false
+        | exact (RAT _) = true
+        | exact (CPX (a, b)) = exact a andalso exact b
+
+      fun remainder (FIX a, FIX b) = FIX (Int.rem (a, b))
+        | remainder (BIG a, BIG b) = BIG (IntInf.rem (a, b))
+        | remainder (FIX a, BIG b) = BIG (IntInf.rem (IntInf.fromInt a, b))
+        | remainder (BIG a, FIX b) = BIG (IntInf.rem (a, IntInf.fromInt b))
+        | remainder _ = raise Fail "Invalid input to remainder"
+
+      fun ratnum (n, d) =
+         if not (exact n andalso exact d)
+            then raise Fail "Inexact rational"
+         else
+            case (n, d) of
+               (_, FIX 0) => raise Div
+             | (FIX 0, _) => FIX 0
+             | _ => raise Fail "NYI"
+   end
+
    datatype sexp =
       (* Atoms *)
       SYMBOL of string
     | STRING of string
-    | FIXNUM of int
-    | BIGNUM of IntInf.int
-    | FLONUM of real
-    | RATNUM of sexp * sexp
-    | CPXNUM of sexp * sexp
+    | NUMBER of Num.t
     | BYTEVECTOR of Word8Vector.vector
     | NIL
     | TRUE
@@ -61,6 +132,8 @@ struct
             orelse sym = "."
             orelse String.isPrefix "+nan" sym
             orelse String.isPrefix "-nan" sym
+            orelse String.isPrefix "+inf" sym
+            orelse String.isPrefix "-inf" sym
             orelse String.isPrefix "+." sym
             orelse String.isPrefix "-." sym
             orelse CharVector.exists weirdChar sym
@@ -96,34 +169,7 @@ struct
       in
          "\"" ^ String.translate escape str ^ "\""
       end
-     | toString (FIXNUM n) =
-      if n < 0
-         then "-" ^ Int.toString (~n)
-      else Int.toString n
-     | toString (BIGNUM n) =
-      if n < 0
-         then "-" ^ IntInf.toString (~n)
-      else IntInf.toString n
-     | toString (FLONUM n) =
-      if Real.isFinite n
-         then if n < 0.0
-                 then "-" ^ Real.toString (~n)
-              else Real.toString n
-      else if Real.isNan n
-         then "+nan.0"
-      else if n < 0.0
-         then "-inf.0"
-      else "+inf.0"
-     | toString (RATNUM (n, d)) =
-      toString n ^ "/" ^ toString d
-     | toString (CPXNUM (a, b)) =
-      let
-         val bstr = toString b
-      in
-         if String.sub (bstr, 0) = #"-"
-            then toString a ^ bstr ^ "i"
-         else toString a ^ "+" ^ bstr ^ "i"
-      end
+     | toString (NUMBER n) = Num.toString n
      | toString (BYTEVECTOR v) =
       let
          fun go (w, "") = Word8.fmt StringCvt.DEC w
@@ -152,8 +198,6 @@ struct
 
 
    exception ParseError of string
-
-   structure P = ParserComb
 
    datatype raw =
       CLOSE
@@ -328,15 +372,19 @@ struct
                then raise Fail "TODO: readNum"
             else raise Fail "TODO: readSym"
 
-   fun parseNum (): (sexp, 'strm) P.parser = P.or'
-      [ P.wrap (IntInf.scan StringCvt.DEC, fn n =>
-         case (Int.minInt, Int.maxInt) of
-            (SOME min, SOME max) =>
-               if IntInf.fromInt min <= n andalso n <= IntInf.fromInt max
-                  then FIXNUM (IntInf.toInt n)
-               else BIGNUM n
-          | _ => FIXNUM (IntInf.toInt n))
-      ]
+   structure P = ParserComb
+
+   fun intralineWhitespace x =
+      P.or' [P.char #" ", P.char #"\t"] x
+
+   fun rawWhitespace x =
+      P.or (intralineWhitespace, P.char #"\n") x
+
+   fun delimiter x =
+      P.or' [rawWhitespace, P.char #"|", P.char #"("] x
+
+   fun boolean x =
+      P.or' [P.string "#true", P.string "#false", P.string "#t", P.string "#f"] x
 end
 
 (* vim: set ts=3 sw=3 tw=0: *)

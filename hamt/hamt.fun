@@ -2,7 +2,7 @@
 
 functor HAMTFn(Key: HASH_KEY) =
 struct
-   open Compat
+   open Util
 
    structure Key = Key
    structure SV = SparseVector
@@ -18,14 +18,12 @@ struct
     | LEAF of Word32.word * Key.hash_key * 'a
     | COLLISION of Word32.word * 'a VM.map
 
-
    fun hashKey k =
       Word32.fromLarge (Word.toLarge (Word.andb (Key.hashVal k, 0wxffffffff)))
 
    val bitsPerSubkey = 0w5
 
    fun index (h, s) = Word32.toInt (Word32.andb (Word32.>> (h, s), 0wx1f))
-
 
    (**)
 

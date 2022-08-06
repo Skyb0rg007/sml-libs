@@ -1,7 +1,7 @@
 
 functor VectorMapFn(Key: EQ_KEY) : EQ_MAP =
 struct
-   open Compat
+   open Util
    structure V = Vector
    structure Key = Key
 
@@ -104,15 +104,7 @@ struct
    fun remove (T vec, k) =
       case V.findi (fn (_, (k', _)) => Key.sameKey (k, k')) vec of
          NONE => NONE
-       | SOME (i, (_, v')) =>
-            let
-               fun gen j =
-                  if j < i
-                     then V.sub (vec, j)
-                  else V.sub (vec, j + 1)
-            in
-               SOME (T (V.tabulate (V.length vec - 1, gen)), v')
-            end
+       | SOME (i, (_, v')) => SOME (T (V.remove (vec, i)), v')
 
    fun delete (m, k) =
       case remove (m, k) of

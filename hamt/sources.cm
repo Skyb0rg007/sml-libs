@@ -4,6 +4,7 @@ Group is
     $/smlnj-lib.cm
 
     compat-smlnj.sml
+    util.sml
 
     sparse-vector.sig
     sparse-vector.sml

@@ -64,7 +64,7 @@ sig
    (* Higher-order operators *)
    val map: ('a -> 'b) -> 'a t -> 'b t
    val mapi: (int * 'a -> 'b) -> 'a t -> 'b t
-   (* val mapAccuml: ('c * 'a -> 'c * 'b) -> 'c -> 'a t -> 'c * 'b t *)
+   val mapAccuml: ('a * 'c -> 'b * 'c) -> 'c -> 'a t -> 'c * 'b t
    (* val mapAccumli: (int * 'c * 'a -> 'c * 'b) -> 'c -> 'a t -> 'c * 'b t *)
    (* val mapAccumr: ('c * 'a -> 'c * 'b) -> 'c -> 'a t -> 'c * 'b t *)
    (* val mapAccumri: (int * 'c * 'a -> 'c * 'b) -> 'c -> 'a t -> 'c * 'b t *)
