@@ -10,11 +10,3 @@ Group is
 
     push.sig
     push.sml
-
-    (* meta.sig *)
-    (* meta.sml *)
-
-    (* streaming.sml *)
-
-    (* stream.sig *)
-    (* stream.sml *)

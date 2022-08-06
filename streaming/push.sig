@@ -85,10 +85,11 @@ val fromPull: ('a, 's1) Pull.t -> ('a, 's2) t
 type 'a stream
 val toPull: ('a, 'a stream) t -> ('a, unit -> 'a stream) Pull.t
 
-(** Query **)
+(** Size **)
 
 val size: ('a, 's) t -> Size.t
 val length: ('a, int) t -> int
+val unsafeSized: ('a, 's) t * Size.t -> ('a, 's) t
 
 end
 

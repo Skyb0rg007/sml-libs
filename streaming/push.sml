@@ -199,6 +199,8 @@ fun toListRev s = foldl op :: [] s
 
 fun size (T {size, ...}) = size
 
+fun unsafeSized (T {fold, ...}, size) = T {fold = fold, size = size}
+
 fun length (s as T {size, ...}) =
    case Size.exact size of
       SOME n => n
