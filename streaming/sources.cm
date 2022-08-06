@@ -1,5 +1,14 @@
 
-Group is
+Library
+    signature SIZE
+    structure Size
+
+    signature PULL
+    structure Pull
+
+    signature PUSH
+    structure Push
+is
     $/basis.cm
 
     size.sig

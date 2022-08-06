@@ -1,0 +1,22 @@
+
+local
+   $(SML_LIB)/basis/basis.mlb
+
+   size.sig
+   size.sml
+   pull.sig
+   pull.sml
+   push.sig
+   push.sml
+in
+   signature SIZE
+   structure Size
+
+   signature PULL
+   structure Pull
+
+   signature PUSH
+   structure Push
+end
+
+(* vim: set ts=3 sw=3: *)
