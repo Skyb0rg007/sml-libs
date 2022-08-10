@@ -34,7 +34,7 @@ datatype 'a map =
 (* Given a bitmask `m` with one bit set (say `m = 0w1 << n`),
  * zeroes out the lower `n + 1` bits of `k`
  *
- * Ex. `mask (0wxff, 0w1 << 0w4) = 0wxe0` (upper 3 bits of 0wxff)
+ * Ex. `mask (0wxff, 0w1 << 0w4) = 0wxe0` (zeroed out the lower 5 bits)
  *)
 fun mask (k, m) = W.andb (k, W.xorb (m, W.+ (W.notb m, W.fromInt 1)))
 
