@@ -10,8 +10,7 @@ functor WordMapFn(W:
        * The set bit is the largest set bit in the input word
        * On an input of 0, output is undefined *)
       val highestBitMask: word -> word
-   end) =
-   (* end): WORD_MAP where type key = W.word = *)
+   end): WORD_MAP where type key = W.word =
 struct
 
 type key = W.word
