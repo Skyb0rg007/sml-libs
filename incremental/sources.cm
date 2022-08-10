@@ -1,0 +1,13 @@
+
+Group is
+  $/basis.cm
+
+  disjoint-set.sig
+  disjoint-set.sml
+
+  lazy-sharing-pair.fun
+
+  lazy-sharing-word-map.sig
+  lazy-sharing-word-map.fun
+
+(* vim: set tw=0 sw=2 ts=2: *)
