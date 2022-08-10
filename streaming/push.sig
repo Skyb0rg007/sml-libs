@@ -35,6 +35,10 @@ val fromList: 'a list -> ('a, 's) t
 (* Produces the elements of the list from left-to-right *)
 val fromListRev: 'a list -> ('a, 's) t
 
+(* Stream from the given number to infinity *)
+val countFrom: int -> (int, 's) t
+val countFrom': int -> (int, 's) t
+
 (* Modify elements with a mapping function *)
 val map: ('a -> 'b) -> ('a, 's) t -> ('b, 's) t
 
@@ -49,6 +53,7 @@ val map2: ('a * 'b -> 'c) -> ('a, 's) t * ('b, 's) t -> ('c, 's) t
 
 (* Limit the stream to the first `n` items *)
 val take: int -> ('a, int -> 's) t -> ('a, 's) t
+val take': int -> ('a, 's) t -> ('a, 's) t
 
 (* Skip the first `n` items *)
 val drop: int -> ('a, int -> 's) t -> ('a, 's) t

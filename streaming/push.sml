@@ -97,6 +97,35 @@ fun toPull (T {fold, size}) =
       Pull.unsafeSized (Pull.unfold step seed, size)
    end
 
+fun countFrom i =
+   T {
+      fold = fn (c, n) =>
+         let
+            fun go i = c (i, fn () => go (i + 1))
+         in
+            go i
+         end,
+      size = Size.unknown
+   }
+
+fun countFrom' i =
+   T {
+      fold = fn (c, n) =>
+         let
+            val i = ref i
+            fun go () =
+               let
+                  val x = !i
+                  val () = i := !i + 1
+               in
+                  c (x, go)
+               end
+         in
+            go ()
+         end,
+      size = Size.unknown
+   }
+
 fun map f (T {fold, size}) =
    T {
       fold = fn (c, n) => fold (fn (a, s) => c (f a, s), n),
@@ -136,6 +165,22 @@ fun take i (T {fold, size}) =
             fun n' () _ = n ()
          in
             fold (c', n') i
+         end,
+      size = Size.min (Size.fromInt i, size)
+   }
+
+fun take' i (T {fold, size}) =
+   T {
+      fold = fn (c, n) =>
+         let
+            val i = ref i
+
+            fun c' (a, s) =
+               if !i <= 0
+                  then n ()
+               else (i := !i - 1; c (a, s))
+         in
+            fold (c', n)
          end,
       size = Size.min (Size.fromInt i, size)
    }
