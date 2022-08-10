@@ -5,19 +5,44 @@ functor WordMapFn(W:
       include WORD
 
       val same: word * word -> bool
+
+      (* Returns a word with one bit set
+       * The set bit is the largest set bit in the input word
+       * On an input of 0, output is undefined *)
       val highestBitMask: word -> word
-   end): WORD_MAP where type key = W.word =
+   end) =
+   (* end): WORD_MAP where type key = W.word = *)
 struct
 
 type key = W.word
 
+(* Invariants:
+ *
+ * - `Nil` only appears at toplevel; never as a subtree of `Bin`
+ * - Given `Bin (prefix, mask, l, r)`:
+ *    + `prefix` does not have any set bits equal to or below the `mask` bit
+ *    + For any key `k` in `l` or `r`,
+ *      the bits above the `mask` bit agree with `prefix`.
+ *      Ex. if k=0b1001 and m=0b0010, then prefix must be 0b1000
+ *    + Keys in `l` do not have the `mask` bit set
+ *    + Keys in `r` have the `mask` bit set
+ *)
 datatype 'a map =
    Nil
  | Tip of key * 'a
  | Bin of W.word * W.word * 'a map * 'a map
 
+(* Given a bitmask `m` with one bit set (say `m = 0w1 << n`),
+ * zeroes out the lower `n + 1` bits of `k`
+ *
+ * Ex. `mask (0wxff, 0w1 << 0w4) = 0wxe0` (upper 3 bits of 0wxff)
+ *)
 fun mask (k, m) = W.andb (k, W.xorb (m, W.+ (W.notb m, W.fromInt 1)))
 
+(* Create a `Bin` node for the subtrees `t1` and `t2`
+ * `p1` and `p2` are the common prefixes of the respective trees
+ * Note: The prefixes `p1` and `p2` *must* be different
+ *)
 fun link (p1, t1, p2, t2) =
    let
       val m = W.highestBitMask (W.xorb (p1, p2))
@@ -28,13 +53,21 @@ fun link (p1, t1, p2, t2) =
       else Bin (p, m, t2, t1)
    end
 
+(* Returns true if the key `k` does not match the prefix-mask pair `p`, `m`
+ * Checks the upper bits of `k` against `p`,
+ * where the number of bits is decided by `m`
+ *)
 fun nomatch (k, p, m) = not (W.same (mask (k, m), p))
 
+(* Returns true if the mask bit given by `m` is zero in the key `k` *)
 fun zero (k, m) = W.same (W.andb (k, m), W.fromInt 0)
 
-(* A mask is shorter if the value is larger, since we use big-endian *)
+(* Determine which mask denotes a smaller key prefix
+ * A mask is shorter if the value is larger, since we use big-endian
+ *)
 val shorter = W.>
 
+(* Smart-constructors: check for empty subtrees *)
 fun bin (_, _, Nil, r) = r
   | bin (_, _, l, Nil) = l
   | bin (p, m, l, r) = Bin (p, m, l, r)
@@ -164,8 +197,8 @@ fun update f (t, k) =
          if nomatch (k, p, m)
             then t
          else if zero (k, m)
-            then bin (p, m, go l, r)
-         else bin (p, m, l, go r)
+            then binCheckL (p, m, go l, r)
+         else binCheckR (p, m, l, go r)
    in
       go t
    end
@@ -219,8 +252,8 @@ fun alter f (t, k) =
                   SOME x => link (k, Tip (k, x), p, t)
                 | NONE => t
          else if zero (k, m)
-            then bin (p, m, go l, r)
-         else bin (p, m, l, go r)
+            then binCheckL (p, m, go l, r)
+         else binCheckR (p, m, l, go r)
    in
       go t
    end
@@ -314,8 +347,8 @@ fun differenceWithi f =
                if nomatch (p2, p1, m1)
                   then t1
                else if zero (p2, m1)
-                  then bin (p1, m1, go (l1, t2), r1)
-               else bin (p1, m1, l1, go (r1, t2))
+                  then binCheckL (p1, m1, go (l1, t2), r1)
+               else binCheckR (p1, m1, l1, go (r1, t2))
          else if shorter (m2, m1)
             then
                if nomatch (p1, p2, m2)
