@@ -242,20 +242,28 @@ fun groupBy eq s () =
          Cons (cons (x, takeWhile (fn y => eq (x, y)) xs),
                groupBy eq (dropWhile (fn y => eq (x, y)) xs))
 
-structure Susp = SMLofNJ.Susp
-
-fun memo f =
-   let
-      val susp = Susp.delay f
-   in
-      fn () => Susp.force susp
-   end
-
 fun memoize s =
-   memo (fn () =>
-      case s () of
-         Nil => Nil
-       | Cons (x, xs) => Cons (x, memoize xs))
+   let
+      datatype 'a result = Lazy | Exn of exn | Strict of 'a
+
+      val res = ref Lazy
+   in
+      fn () =>
+         case !res of
+            Strict x => x
+          | Exn e => raise e
+          | Lazy =>
+               let
+                  val x =
+                     case s () of
+                        Nil => Nil
+                      | Cons (x, xs) => Cons (x, memoize xs)
+               in
+                  res := Strict x
+                  ; x
+               end
+               handle e => (res := Exn e; raise e)
+   end
 
 fun zip (s1, s2) () =
    case s1 () of
@@ -264,6 +272,39 @@ fun zip (s1, s2) () =
          case s2 () of
             Nil => Nil
           | Cons (y, ys) => Cons ((x, y), zip (xs, ys))
+
+fun unzip (s: ('a * 'b) t) = (map #1 s, map #2 s)
+
+fun transpose s () =
+   let
+      val (heads, tails) = unzip (mapPartial uncons s)
+   in
+      if isEmpty heads
+         then Nil
+      else Cons (heads, transpose tails)
+   end
+
+fun diagonals s =
+   let
+      fun go (r, s) () =
+         case s () of
+            Nil => transpose r ()
+          | Cons (xs, xss) =>
+               let
+                  val (heads, tails) = unzip (mapPartial uncons r)
+                  val (heads', tails') =
+                     case xs () of
+                        Nil => (heads, tails)
+                      | Cons (x, xs) => (cons (x, heads), cons (xs, tails))
+               in
+                  Cons (heads', go (tails', xss))
+               end
+   in
+      go (empty, s)
+   end
+
+fun product f (s1, s2) =
+   concat (diagonals (map (fn x => map (fn y => f (x, y)) s2) s1))
 
 end
 

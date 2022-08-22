@@ -46,6 +46,9 @@ val dropWhile: ('a -> bool) -> 'a t -> 'a t
 val groupBy: ('a * 'a -> bool) -> 'a t -> 'a t t
 val memoize: 'a t -> 'a t
 val zip: 'a t * 'b t -> ('a * 'b) t
+val unzip: ('a * 'b) t -> 'a t * 'b t
+val transpose: 'a t t -> 'a t t
+val product: ('a * 'b -> 'c) -> 'a t * 'b t -> 'c t
 
 end
 (* vim: set tw=0 ts=3 sw=3: *)
