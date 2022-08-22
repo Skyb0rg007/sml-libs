@@ -1,0 +1,42 @@
+
+Library
+  signature MAP
+
+  signature WORD_MAP
+  structure WordMap
+  structure Word8Map
+  structure Word32Map
+  structure Word64Map
+
+  signature HASH_KEY
+  functor HAMTFn
+
+  signature MONO_MAP
+  functor MonomorphizeMapFn
+
+  signature LSS_WORD_MAP
+  signature LSS_WORD_MAP_STRUCTS
+  functor LSSWordMapFn
+is
+  $/basis.cm
+  $/smlnj-lib.cm
+
+  ../disjoint-set/sources.cm
+
+  map.sig
+
+  word-map.sig
+  word-map.fun
+  word-map.sml
+  word8-map.sml
+  word32-map.sml
+  word64-map.sml
+
+  hamt.fun
+
+  mono-map.sig
+  monomorphize-map.fun
+
+  lss-word-map.sig
+  lss-word-map.fun
+(* vim: set tw=0 ts=2 sw=2: *)

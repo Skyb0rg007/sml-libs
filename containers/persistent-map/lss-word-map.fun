@@ -20,6 +20,10 @@ sig
           * If this returns false, nothing is known about the values
           * Used for optimization *)
          val shallowEq: t * t -> bool
+
+         (* Hash the value
+          * If two values are equal via `same`, they must have the same hash *)
+         val hash: t -> word
       end
 end
 
@@ -38,9 +42,30 @@ datatype node =
  | Tip of key * value
  | Bin of W.word * W.word * map * map
 
-withtype map = node DS.t
+and map = Map of {node: node DS.t, hash: word}
 
 fun mask (k, m) = W.andb (k, W.xorb (m, W.+ (W.notb m, W.fromInt 1)))
+
+fun hashCombine (w1, w2) =
+   let
+      open Word
+      infix xorb >> <<
+      val magic = 0wx9e3779b9
+   in
+      w1 xorb (w2 + magic + (w1 << 0w6) + (w1 >> 0w2))
+   end
+
+fun hash (Map {hash, ...}) = hash
+
+fun node (Map {node, ...}) = DS.! node
+
+fun node' (Map {node, ...}) = node
+
+fun hashNode Nil = 0wxdeadbeef
+  | hashNode (Tip (k, v)) = hashCombine (Word.fromLarge (W.toLarge k), Value.hash v)
+  | hashNode (Bin (_, _, l, r)) = hashCombine (hash l, hash r)
+
+fun make node = Map {node = DS.make node, hash = hashNode node}
 
 fun link (p1, t1, p2, t2) =
    let
@@ -48,8 +73,8 @@ fun link (p1, t1, p2, t2) =
       val p = mask (p1, m)
    in
       if W.same (W.andb (p1, m), W.fromInt 0)
-         then DS.make (Bin (p, m, t1, t2))
-      else DS.make (Bin (p, m, t2, t1))
+         then make (Bin (p, m, t1, t2))
+      else make (Bin (p, m, t2, t1))
    end
 
 fun nomatch (k, p, m) = not (W.same (mask (k, m), p))
@@ -59,35 +84,39 @@ fun zero (k, m) = W.same (W.andb (k, m), W.fromInt 0)
 (* A mask is shorter if the value is larger, since we use big-endian *)
 val shorter = W.>
 
+val empty = make Nil
+
 fun bin (p, m, l, r) =
-   case DS.! l of
-      Nil => r
+   case node l of
+      Nil => (DS.union (node' l, node' empty); r)
     | _ =>
-         case DS.! r of
-            Nil => l
-          | _ => DS.make (Bin (p, m, l, r))
+         case node r of
+            Nil => (DS.union (node' r, node' empty); l)
+          | _ => make (Bin (p, m, l, r))
 
 fun binCheckL (p, m, l, r) =
-   case DS.! l of
-      Nil => r
-    | _ => DS.make (Bin (p, m, l, r))
+   case node l of
+      Nil => (DS.union (node' l, node' empty); r)
+    | _ => make (Bin (p, m, l, r))
 
 fun binCheckR (p, m, l, r) =
-   case DS.! r of
-      Nil => l
-    | _ => DS.make (Bin (p, m, l, r))
+   case node r of
+      Nil => (DS.union (node' r, node' empty); l)
+    | _ => make (Bin (p, m, l, r))
 
-val tip = DS.make o Tip
+val tip = make o Tip
 
 (** Exports **)
 
 (* Determine if the two maps are the same
  * `O(n)` worst case, `O(α⁻¹(n))` amortized *)
 fun equals (t1, t2) =
-   if DS.same (t1, t2)
+   if hash t1 <> hash t2
+      then false
+   else if DS.same (node' t1, node' t2)
       then true
-   else if equalsNode (DS.! t1, DS.! t2)
-      then (DS.union (t1, t2); true)
+   else if equalsNode (node t1, node t2)
+      then (DS.union (node' t1, node' t2); true)
    else false
 
 and equalsNode (Nil, Nil) = true
@@ -101,8 +130,6 @@ and equalsNode (Nil, Nil) = true
    andalso equals (r1, r2)
   | equalsNode _ = false
 
-val empty = DS.make Nil
-
 val singleton = tip
 
 fun insertLookupWithi f (t, k, x) =
@@ -110,7 +137,7 @@ fun insertLookupWithi f (t, k, x) =
       fun mapSnd f (a, b) = (a, f b)
 
       fun go t =
-         case DS.! t of
+         case node t of
             Nil => (NONE, tip (k, x))
           | Tip (k', x') =>
                if W.same (k, k')
@@ -120,8 +147,8 @@ fun insertLookupWithi f (t, k, x) =
                if nomatch (k, p, m)
                   then (NONE, link (p, t, k, tip (k, x)))
                else if zero (k, m)
-                  then mapSnd (fn l' => DS.make (Bin (p, m, l', r))) (go l)
-               else mapSnd (fn r' => DS.make (Bin (p, m, l, r'))) (go r)
+                  then mapSnd (fn l' => make (Bin (p, m, l', r))) (go l)
+               else mapSnd (fn r' => make (Bin (p, m, l, r'))) (go r)
    in
       go t
    end
@@ -129,7 +156,7 @@ fun insertLookupWithi f (t, k, x) =
 fun insertWithi f (t, k, x) =
    let
       fun go t =
-         case DS.! t of
+         case node t of
             Nil => tip (k, x)
           | Tip (k', x') =>
                if W.same (k, k')
@@ -139,8 +166,8 @@ fun insertWithi f (t, k, x) =
                if nomatch (k, p, m)
                   then link (p, t, k, tip (k, x))
                else if zero (k, m)
-                  then DS.make (Bin (p, m, go l, r))
-               else DS.make (Bin (p, m, l, go r))
+                  then make (Bin (p, m, go l, r))
+               else make (Bin (p, m, l, go r))
    in
       go t
    end
@@ -164,7 +191,7 @@ fun fromListWith f xs =
 fun remove (t, k) =
    let
       fun go t =
-         case DS.! t of
+         case node t of
             Nil => NONE
           | Tip (k', x') =>
                if W.same (k, k')
@@ -194,7 +221,7 @@ fun delete (t, k) =
 fun adjust f (t, k) =
    let
       fun go t =
-         case DS.! t of
+         case node t of
             Nil => t
           | Tip (k', x') =>
                if W.same (k, k')
@@ -215,17 +242,17 @@ fun adjust f (t, k) =
                      let
                         val l' = go l
                      in
-                        if DS.shallowEq (l, l')
+                        if DS.shallowEq (node' l, node' l')
                            then t
-                        else DS.make (Bin (p, m, l', r))
+                        else make (Bin (p, m, l', r))
                      end
                else
                   let
                      val r' = go r
                   in
-                     if DS.shallowEq (r, r')
+                     if DS.shallowEq (node' r, node' r')
                         then t
-                     else DS.make (Bin (p, m, l, r'))
+                     else make (Bin (p, m, l, r'))
                   end
    in
       go t
@@ -234,7 +261,7 @@ fun adjust f (t, k) =
 fun update f (t, k) =
    let
       fun go t =
-         case DS.! t of
+         case node t of
             Nil => t
           | Tip (k', x') =>
                if W.same (k, k')
@@ -254,7 +281,7 @@ fun update f (t, k) =
                      let
                         val l' = go l
                      in
-                        if DS.shallowEq (l, l')
+                        if DS.shallowEq (node' l, node' l')
                            then t
                         else binCheckL (p, m, l', r)
                      end
@@ -262,7 +289,7 @@ fun update f (t, k) =
                   let
                      val r' = go r
                   in
-                     if DS.shallowEq (r, r')
+                     if DS.shallowEq (node' r, node' r')
                         then t
                      else binCheckR (p, m, l, r')
                   end
@@ -270,67 +297,90 @@ fun update f (t, k) =
       go t
    end
 
-fun updateLookupWithi f (t, k) = raise Fail "NYI"
-   (* let *)
-   (*    fun go Nil = (NONE, Nil) *)
-   (*      | go (t as Tip (k', x')) = *)
-   (*       if W.same (k, k') *)
-   (*          then *)
-   (*             case f (k, x') of *)
-   (*                NONE => (SOME x', Nil) *)
-   (*              | SOME y => (SOME x', Tip (k, y)) *)
-   (*       else (NONE, t) *)
-   (*      | go (t as Bin (p, m, l, r)) = *)
-   (*       if nomatch (k, p, m) *)
-   (*          then (NONE, t) *)
-   (*       else if zero (k, m) *)
-   (*          then *) 
-   (*             case go l of *)
-   (*                (ox, Nil) => (ox, r) *)
-   (*              | (ox, l') => (ox, Bin (p, m, l', r)) *)
-   (*       else *) 
-   (*          case go r of *)
-   (*             (ox, Nil) => (ox, l) *)
-   (*           | (ox, r') => (ox, Bin (p, m, l, r')) *)
-   (* in *)
-   (*    go t *)
-   (* end *)
+fun updateLookupWithi f (t, k) =
+   let
+      fun go t =
+         case node t of
+            Nil => (NONE, t)
+          | Tip (k', x) =>
+               if W.same (k, k')
+                  then
+                     case f (k, x) of
+                        NONE => (SOME x, empty)
+                      | SOME y =>
+                           if Value.shallowEq (x, y)
+                              then (SOME x, t)
+                           else (SOME x, tip (k, y))
+               else (NONE, t)
+          | Bin (p, m, l, r) =>
+               if nomatch (k, p, m)
+                  then (NONE, t)
+               else if zero (k, m)
+                  then
+                     let
+                        val (ox, l') = go l
+                     in
+                        (* XXX: Check if `same (l, l')`? *)
+                        (ox, binCheckL (p, m, l', r))
+                     end
+               else 
+                  let
+                     val (ox, r') = go r
+                  in
+                     (ox, binCheckR (p, m, l, r'))
+                  end
+   in
+      go t
+   end
 
-fun alter f (t, k) = raise Fail "NYI"
-   (* let *)
-   (*    fun go Nil = *)
-   (*       (case f NONE of *)
-   (*          SOME x => Tip (k, x) *)
-   (*        | NONE => Nil) *)
-   (*      | go (t as Tip (k', x')) = *)
-   (*       if W.same (k, k') *)
-   (*          then *)
-   (*             case f (SOME x') of *)
-   (*                SOME y => Tip (k, y) *)
-   (*              | NONE => Nil *)
-   (*       else *)
-   (*          (case f NONE of *)
-   (*             SOME y => link (k, Tip (k, y), k', t) *)
-   (*           | NONE => t) *)
-   (*      | go (t as Bin (p, m, l, r)) = *)
-   (*       if nomatch (k, p, m) *)
-   (*          then *)
-   (*             case f NONE of *)
-   (*                SOME x => link (k, Tip (k, x), p, t) *)
-   (*              | NONE => t *)
-   (*       else if zero (k, m) *)
-   (*          then bin (p, m, go l, r) *)
-   (*       else bin (p, m, l, go r) *)
-   (* in *)
-   (*    go t *)
-   (* end *)
+fun alter f (t, k) =
+   let
+      fun go t =
+         case node t of
+            Nil => (case f NONE of
+                       SOME x => tip (k, x)
+                     | NONE => empty)
+          | Tip (k', x) =>
+               if W.same (k, k')
+                  then
+                     case f (SOME x) of
+                        SOME y =>
+                           if Value.shallowEq (x, y)
+                              then t
+                           else tip (k, y)
+                      | NONE => empty
+               else (case f NONE of
+                        SOME y => link (k, tip (k, y), k', t)
+                      | NONE => t)
+          | Bin (p, m, l, r) =>
+               if nomatch (k, p, m)
+                  then
+                     case f NONE of
+                        SOME x => link (k, tip (k, x), p, t)
+                      | NONE => t
+               else if zero (k, m)
+                  then
+                     let
+                        val l' = go l
+                     in
+                        bin (p, m, l', r)
+                     end
+               else
+                  let
+                     val r' = go r
+                  in
+                     bin (p, m, l, r')
+                  end
+   in
+      go t
+   end
 
 (** Lookup **)
 
 fun find (t, k) =
    let
       fun go t =
-         case DS.! t of
+         case node t of
             Nil => NONE
           | Tip (k', x') =>
                if W.same (k, k')
@@ -355,7 +405,7 @@ fun isEmpty t = equals (t, empty)
 fun size t =
    let
       fun go (t, acc) =
-         case DS.! t of
+         case node t of
             Nil => acc
           | Tip _ => acc + 1
           | Bin (_, _, l, r) => go (l, go (r, acc))
@@ -373,7 +423,7 @@ fun unionWithi f =
          if equals (t1, t2)
             then t1
          else
-            case (DS.! t1, DS.! t2) of
+            case (node t1, node t2) of
                (Nil, _) => t2
              | (_, Nil) => t1
              | (Tip (k1, x1), _) => insertWithi f' (t2, k1, x1)
@@ -384,17 +434,17 @@ fun unionWithi f =
                         if nomatch (p2, p1, m1)
                            then link (p1, t1, p2, t2)
                         else if zero (p2, m1)
-                           then DS.make (Bin (p1, m1, go (l1, t2), r1))
-                        else DS.make (Bin (p1, m1, l1, go (r1, t2)))
+                           then make (Bin (p1, m1, go (l1, t2), r1))
+                        else make (Bin (p1, m1, l1, go (r1, t2)))
                   else if shorter (m2, m1)
                      then
                         if nomatch (p1, p2, m2)
                            then link (p1, t1, p2, t2)
                         else if zero (p1, m2)
-                           then DS.make (Bin (p2, m2, go (t1, l2), r2))
-                        else DS.make (Bin (p2, m2, l2, go (t1, r2)))
+                           then make (Bin (p2, m2, go (t1, l2), r2))
+                        else make (Bin (p2, m2, l2, go (t1, r2)))
                   else if W.same (p1, p2)
-                     then DS.make (Bin (p1, m1, go (l1, l2), go (r1, r2)))
+                     then make (Bin (p1, m1, go (l1, l2), go (r1, r2)))
                   else link (p1, t1, p2, t2)
    in
       go
@@ -410,7 +460,7 @@ fun differenceWithi f =
          if equals (t1, t2)
             then empty
          else
-            case (DS.! t1, DS.! t2) of
+            case (node t1, node t2) of
                (Nil, _) => t1
              | (_, Nil) => t1
              | (Tip (k1, x1), _) =>
@@ -430,8 +480,8 @@ fun differenceWithi f =
                     if nomatch (p2, p1, m1)
                        then t1
                     else if zero (p2, m1)
-                       then DS.make (Bin (p1, m1, go (l1, t2), r1))
-                    else DS.make (Bin (p1, m1, l1, go (r1, t2)))
+                       then make (Bin (p1, m1, go (l1, t2), r1))
+                    else make (Bin (p1, m1, l1, go (r1, t2)))
               else if shorter (m2, m1)
                  then
                     if nomatch (p1, p2, m2)
@@ -440,7 +490,7 @@ fun differenceWithi f =
                        then go (t1, l2)
                     else go (t1, r2)
               else if W.same (p1, p2)
-                 then DS.make (Bin (p1, m1, go (l1, l2), go (r1, r2)))
+                 then make (Bin (p1, m1, go (l1, l2), go (r1, r2)))
               else t1
    in
       go
@@ -452,167 +502,208 @@ fun difference (t1, t2) = differenceWithi (fn _ => NONE) (t1, t2)
 
 (** Intersection **)
 
-fun intersectionWithi f = raise Fail "NYI"
-   (* let *)
-   (*    fun go (Nil, _) = Nil *)
-   (*      | go (_, Nil) = Nil *)
-   (*      | go (Tip (k1, x1), t2) = *)
-   (*       (case find (t2, k1) of *)
-   (*          NONE => Nil *)
-   (*        | SOME x2 => *)
-   (*             case f (k1, x1, x2) of *)
-   (*                NONE => Nil *)
-   (*              | SOME y => Tip (k1, y)) *)
-   (*      | go (t1, Tip (k2, x2)) = *)
-   (*       (case find (t1, k2) of *)
-   (*          NONE => Nil *)
-   (*        | SOME x1 => *)
-   (*             case f (k2, x1, x2) of *)
-   (*                NONE => Nil *)
-   (*              | SOME y => Tip (k2, y)) *)
-   (*      | go (t1 as Bin (p1, m1, l1, r1), t2 as Bin (p2, m2, l2, r2)) = *)
-   (*       if shorter (m1, m2) *)
-   (*          then *)
-   (*             if nomatch (p2, p1, m1) *)
-   (*                then Nil *)
-   (*             else if zero (p2, m1) *)
-   (*                then go (l1, t2) *)
-   (*             else go (r1, t2) *)
-   (*       else if shorter (m2, m1) *)
-   (*          then *)
-   (*             if nomatch (p1, p2, m2) *)
-   (*                then Nil *)
-   (*             else if zero (p1, m2) *)
-   (*                then go (t1, l2) *)
-   (*             else go (t1, r2) *)
-   (*       else if W.same (p1, p2) *)
-   (*          then bin (p1, m1, go (l1, l2), go (r1, r2)) *)
-   (*       else Nil *)
-   (* in *)
-   (*    go *)
-   (* end *)
+fun intersectionWithi f =
+   let
+      fun go (t1, t2) =
+         if equals (t1, t2)
+            then t1
+         else
+            case (node t1, node t2) of
+               (Nil, _) => t1
+             | (_, Nil) => t2
+             | (Tip (k1, x1), _) =>
+                  (case find (t2, k1) of
+                      NONE => empty
+                    | SOME y => tip (k1, y))
+             | (_, Tip (k2, x2)) =>
+                  (case find (t1, k2) of
+                      NONE => empty
+                    | SOME x1 =>
+                        case f (k2, x1, x2) of
+                           NONE => empty
+                         | SOME y => tip (k2, y))
+             | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
+                  if shorter (m1, m2)
+                     then
+                        if nomatch (p2, p1, m1)
+                           then empty
+                        else if zero (p2, m1)
+                           then go (l1, t2)
+                        else go (t1, t2)
+                  else if shorter (m2, m1)
+                     then
+                        if nomatch (p1, p2, m2)
+                           then empty
+                        else if zero (p1, m2)
+                           then go (t1, l2)
+                        else go (t1, r2)
+                  else if W.same (p1, p2)
+                     then bin (p1, m1, go (l1, l2), go (r1, r2))
+                  else empty
+   in
+      go
+   end
 
 fun intersectionWith f = intersectionWithi (fn (_, x, x') => f (x, x'))
 
 fun intersection (t1, t2) = intersectionWithi (fn (_, x, _) => SOME x) (t1, t2)
 
-fun disjoint _ = raise Fail "NYI"
-(* fun disjoint (Nil, _) = true *)
-(*   | disjoint (_, Nil) = true *)
-(*   | disjoint (Tip (k1, _), t2) = not (inDomain (t2, k1)) *)
-(*   | disjoint (t1, Tip (k2, _)) = not (inDomain (t1, k2)) *)
-(*   | disjoint (t1 as Bin (p1, m1, l1, r1), t2 as Bin (p2, m2, l2, r2)) = *)
-(*    if shorter (m1, m2) *)
-(*       then *)
-(*          if nomatch (p2, p1, m1) *)
-(*             then true *)
-(*          else if zero (p2, m1) *)
-(*             then disjoint (l1, t2) *)
-(*          else disjoint (r1, t2) *)
-(*    else if shorter (m2, m1) *)
-(*       then *)
-(*          if nomatch (p1, p2, m2) *)
-(*             then true *)
-(*          else if zero (p1, m2) *)
-(*             then disjoint (t1, l2) *)
-(*          else disjoint (t1, r2) *)
-(*    else if W.same (p1, p2) *)
-(*       then disjoint (l1, l2) andalso disjoint (r1, r2) *)
-(*    else true *)
+fun disjoint (t1, t2) =
+   if equals (t1, t2)
+      then false
+   else
+      case (node t1, node t2) of
+         (Nil, _) => true
+       | (_, Nil) => true
+       | (Tip (k1, _), _) => not (inDomain (t2, k1))
+       | (_, Tip (k2, _)) => not (inDomain (t1, k2))
+       | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
+            if shorter (m1, m2)
+               then
+                  if nomatch (p2, p1, m1)
+                     then true
+                  else if zero (p2, m1)
+                     then disjoint (l1, t2)
+                  else disjoint (r1, t2)
+            else if shorter (m2, m1)
+               then
+                  if nomatch (p1, p2, m2)
+                     then true
+                  else if zero (p1, m2)
+                     then disjoint (t1, l2)
+                  else disjoint (t1, r2)
+            else if W.same (p1, p2)
+               then disjoint (l1, l2) andalso disjoint (r1, r2)
+            else true
 
 (** Traversal **)
 
-fun mapi _ = raise Fail "NYI"
-(* fun mapi _ Nil = Nil *)
-(*   | mapi f (Tip (k, x)) = Tip (k, f (k, x)) *)
-(*   | mapi f (Bin (p, m, l, r)) = Bin (p, m, mapi f l, mapi f r) *)
+fun mapi f t =
+   case node t of
+      Nil => t
+    | Tip (k, x) =>
+         let
+            val y = f (k, x)
+         in
+            if Value.shallowEq (x, y)
+               then t
+            else tip (k, y)
+         end
+    | Bin (p, m, l, r) =>
+         let
+            val l' = mapi f l
+            val r' = mapi f r
+         in
+            if equals (l, l') andalso equals (r, r')
+               then t
+            else make (Bin (p, m, l, r))
+         end
 
 fun map f = mapi (fn (_, x) => f x)
 
-fun mapAccumLi f z t = raise Fail "NYI"
-   (* let *)
-   (*    fun go (Nil, acc) = (acc, Nil) *)
-   (*      | go (Tip (k, x), acc) = *)
-   (*       let *)
-   (*          val (acc, x) = f (k, x, acc) *)
-   (*       in *)
-   (*          (acc, Tip (k, x)) *)
-   (*       end *)
-   (*      | go (Bin (p, m, l, r), acc) = *)
-   (*       let *)
-   (*          val (acc, l) = go (l, acc) *)
-   (*          val (acc, r) = go (r, acc) *)
-   (*       in *)
-   (*          (acc, Bin (p, m, l, r)) *)
-   (*       end *)
-   (* in *)
-   (*    go (t, z) *)
-   (* end *)
+fun mapAccumLi f z t =
+   let
+      fun go (t, acc) =
+         case node t of
+            Nil => (acc, t)
+          | Tip (k, x) =>
+               let
+                  val (acc', x') = f (k, x, acc)
+               in
+                  if Value.shallowEq (x, x')
+                     then (acc', t)
+                  else (acc', tip (k, x'))
+               end
+          | Bin (p, m, l, r) =>
+               let
+                  val (acc', l') = go (l, acc)
+                  val (acc'', r') = go (r, acc')
+               in
+                  if equals (l, l') andalso equals (r, r')
+                     then (acc'', t)
+                  else (acc'', make (Bin (p, m, l, r)))
+               end
+   in
+      go (t, z)
+   end
 
 fun mapAccumL f = mapAccumLi (fn (_, x, acc) => f (x, acc))
 
-fun mapAccumRi f z t = raise Fail "NYI"
-   (* let *)
-   (*    fun go (Nil, acc) = (acc, Nil) *)
-   (*      | go (Tip (k, x), acc) = *)
-   (*       let *)
-   (*          val (acc, x) = f (k, x, acc) *)
-   (*       in *)
-   (*          (acc, Tip (k, x)) *)
-   (*       end *)
-   (*      | go (Bin (p, m, l, r), acc) = *)
-   (*       let *)
-   (*          val (acc, r) = go (r, acc) *)
-   (*          val (acc, l) = go (l, acc) *)
-   (*       in *)
-   (*          (acc, Bin (p, m, l, r)) *)
-   (*       end *)
-   (* in *)
-   (*    go (t, z) *)
-   (* end *)
+fun mapAccumRi f z t =
+   let
+      fun go (t, acc) =
+         case node t of
+            Nil => (acc, t)
+          | Tip (k, x) =>
+               let
+                  val (acc', x') = f (k, x, acc)
+               in
+                  if Value.shallowEq (x, x')
+                     then (acc', t)
+                  else (acc', tip (k, x'))
+               end
+          | Bin (p, m, l, r) =>
+               let
+                  val (acc', l') = go (l, acc)
+                  val (acc'', r') = go (r, acc')
+               in
+                  if equals (l, l') andalso equals (r, r')
+                     then (acc'', t)
+                  else (acc'', make (Bin (p, m, l, r)))
+               end
+   in
+      go (t, z)
+   end
 
 fun mapAccumR f = mapAccumRi (fn (_, x, acc) => f (x, acc))
 
-fun foldli f z t = raise Fail "NYI"
-   (* let *)
-   (*    fun go (Nil, acc) = acc *)
-   (*      | go (Tip (k, x), acc) = f (k, x, acc) *)
-   (*      | go (Bin (_, _, l, r), acc) = go (r, go (l, acc)) *)
-   (* in *)
-   (*    go (t, z) *)
-   (* end *)
+fun foldli f z t =
+   let
+      fun go (t, acc) =
+         case node t of
+            Nil => acc
+          | Tip (k, x) => f (k, x, acc)
+          | Bin (_, _, l, r) => go (r, go (l, acc))
+   in
+      go (t, z)
+   end
 
 fun foldl f = foldli (fn (_, x, acc) => f (x, acc))
 
-fun foldri f z t = raise Fail "NYI"
-   (* let *)
-   (*    fun go (Nil, acc) = acc *)
-   (*      | go (Tip (k, x), acc) = f (k, x, acc) *)
-   (*      | go (Bin (_, _, l, r), acc) = go (l, go (r, acc)) *)
-   (* in *)
-   (*    go (t, z) *)
-   (* end *)
+fun foldri f z t =
+   let
+      fun go (t, acc) =
+         case node t of
+            Nil => acc
+          | Tip (k, x) => f (k, x, acc)
+          | Bin (_, _, l, r) => go (l, go (r, acc))
+   in
+      go (t, z)
+   end
 
 fun foldr f = foldri (fn (_, x, acc) => f (x, acc))
 
-fun appi _ = raise Fail "NYI"
-(* fun appi _ Nil = () *)
-(*   | appi f (Tip (k, x)) = f (k, x) *)
-(*   | appi f (Bin (_, _, l, r)) = (appi f l; appi f r) *)
+fun appi f t =
+   case node t of
+      Nil => ()
+    | Tip (k, x) => f (k, x)
+    | Bin (_, _, l, r) => (appi f l; appi f r)
 
 fun app f = appi (fn (_, x) => f x)
 
-fun existsi _ = raise Fail "NYI"
-(* fun existsi _ Nil = false *)
-(*   | existsi f (Tip (k, x)) = f (k, x) *)
-(*   | existsi f (Bin (_, _, l, r)) = existsi f l orelse existsi f r *)
+fun existsi f t =
+   case node t of
+      Nil => false
+    | Tip (k, x) => f (k, x)
+    | Bin (_, _, l, r) => existsi f l orelse existsi f r
 
 fun exists f = existsi (fn (_, x) => f x)
 
-fun alli _ = raise Fail "NYI"
-(* fun alli _ Nil = true *)
-(*   | alli f (Tip (k, x)) = f (k, x) *)
-(*   | alli f (Bin (_, _, l, r)) = alli f l andalso alli f r *)
+fun alli f t =
+   case node t of
+      Nil => true
+    | Tip (k, x) => f (k, x)
+    | Bin (_, _, l, r) => alli f l andalso alli f r
 
 fun all f = alli (fn (_, x) => f x)
 
@@ -624,37 +715,73 @@ fun elems t = foldr op :: [] t
 
 fun toList t = foldri (fn (k, x, acc) => (k, x) :: acc) [] t
 
+datatype 'a seq_node = SNil | SCons of 'a * 'a seq
+withtype 'a seq = unit -> 'a seq_node
+
+fun toSeq t =
+   let
+      fun go (t, acc) () =
+         case node t of
+            Nil => acc ()
+          | Tip (k, x) => SCons ((k, x), acc)
+          | Bin (_, _, l, r) => go (l, go (r, acc)) ()
+   in
+      go (t, fn () => SNil)
+   end
+
 (** Filter **)
 
-fun filteri p = raise Fail "NYI"
-   (* let *)
-   (*    fun go Nil = Nil *)
-   (*      | go (t as Tip (k, x)) = *)
-   (*       if p (k, x) *)
-   (*          then t *)
-   (*       else Nil *)
-   (*      | go (Bin (p, m, l, r)) = bin (p, m, go l, go r) *)
-   (* in *)
-   (*    go *)
-   (* end *)
+fun filteri p =
+   let
+      fun go t =
+         case node t of
+            Nil => t
+          | Tip (k, x) =>
+               if p (k, x)
+                  then t
+               else empty
+          | Bin (p, m, l, r) =>
+               let
+                  val l' = go l
+                  val r' = go r
+               in
+                  if equals (l, l') andalso equals (r, r')
+                     then t
+                  else bin (p, m, l', r')
+               end
+   in
+      go
+   end
 
 fun filter p = filteri (fn (_, x) => p x)
 
-fun mapPartiali f = raise Fail "NYI"
-   (* let *)
-   (*    fun go Nil = Nil *)
-   (*      | go (Tip (k, x)) = *)
-   (*       (case f (k, x) of *)
-   (*          NONE => Nil *)
-   (*        | SOME y => Tip (k, y)) *)
-   (*      | go (Bin (p, m, l, r)) = bin (p, m, go l, go r) *)
-   (* in *)
-   (*    go *)
-   (* end *)
+fun mapPartiali f =
+   let
+      fun go t =
+         case node t of
+            Nil => t
+          | Tip (k, x) => (case f (k, x) of
+                              NONE => empty
+                            | SOME y =>
+                                 if Value.shallowEq (x, y)
+                                    then t
+                                 else tip (k, y))
+          | Bin (p, m, l, r) =>
+               let
+                  val l' = go l
+                  val r' = go r
+               in
+                  if equals (l, l') andalso equals (r, r')
+                     then t
+                  else bin (p, m, l', r')
+               end
+   in
+      go
+   end
 
 fun mapPartial f = mapPartiali (fn (_, x) => f x)
 
-fun mapEitheri f = raise Fail "NYI"
+fun mapEitheri f = raise Fail "mapEitheri: NYI"
    (* let *)
    (*    fun go Nil = (Nil, Nil) *)
    (*      | go (Tip (k, x)) = *)
@@ -674,7 +801,7 @@ fun mapEitheri f = raise Fail "NYI"
 
 fun mapEither f = mapEitheri (fn (_, x) => f x)
 
-fun partitioni p = raise Fail "NYI"
+fun partitioni p = raise Fail "partitioni: NYI"
    (* let *)
    (*    fun go Nil = (Nil, Nil) *)
    (*      | go (t as Tip (k, x)) = *)
@@ -696,7 +823,9 @@ fun partition p = partitioni (fn (_, x) => p x)
 
 (** Submap **)
 
-fun isSubmapBy _ = raise Fail "NYI"
+fun isSubmap (t1, t2) = equals (empty, difference (t1, t2))
+
+fun isSubmapBy _ = raise Fail "isSubmapBy: NYI"
 (* fun isSubmapBy _ (Nil, _) = true *)
 (*   | isSubmapBy _ (_, Nil) = false *)
 (*   | isSubmapBy pred (Tip (k, x), t) = *)
@@ -719,7 +848,7 @@ fun isSubmapBy _ = raise Fail "NYI"
 (*       andalso isSubmapBy pred (l1, l2) *)
 (*       andalso isSubmapBy pred (r1, r2) *)
 
-fun isProperSubmapBy pred (t1, t2) = raise Fail "NYI"
+fun isProperSubmapBy pred (t1, t2) = raise Fail "isProperSubmapBy: NYI"
    (* let *)
    (*    (1* LESS -> proper submap *)
    (*     * EQUAL -> equal *)
@@ -759,17 +888,20 @@ fun isProperSubmapBy pred (t1, t2) = raise Fail "NYI"
    (*    go (t1, t2) = LESS *)
    (* end *)
 
-fun liftEquals _ = raise Fail "NYI"
-(* fun liftEquals _ (Nil, Nil) = true *)
-(*   | liftEquals eq (Tip (k, x), Tip (k', x')) = *)
-(*    W.same (k, k') *)
-(*    andalso eq (x, x') *)
-(*   | liftEquals eq (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) = *)
-(*    W.same (m1, m2) *)
-(*    andalso W.same (p1, p2) *)
-(*    andalso liftEquals eq (l1, l2) *)
-(*    andalso liftEquals eq (r1, r2) *)
-(*   | liftEquals _ (_, _) = false *)
+fun liftEquals eq (t1, t2) =
+   if equals (t1, t2)
+      then true
+   else
+      case (node t1, node t2) of
+         (Nil, Nil) => true
+       | (Tip (k, x), Tip (k', x')) =>
+            W.same (k, k') andalso eq (x, x')
+       | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
+            W.same (m1, m2)
+            andalso W.same (p1, p2)
+            andalso liftEquals eq (l1, l2)
+            andalso liftEquals eq (r1, r2)
+       | _ => false
 
 (* TODO: Use pull streams instead of lists *)
 fun collate cmp (t1, t2) =
@@ -790,31 +922,37 @@ fun collate cmp (t1, t2) =
 
 (** WordMap specific **)
 
-fun viewMin _: (key * value * map) option = raise Fail "NYI"
-fun viewMax _: (key * value * map) option = raise Fail "NYI"
-(* fun viewMin Nil = NONE *)
-(*   | viewMin t = *)
-(*    let *)
-(*       fun go Nil = raise Fail "WordMapFn.viewMin: invalid Nil" *)
-(*         | go (Tip (k, x)) = (k, x, Nil) *)
-(*         | go (Bin (p, m, l, r)) = *)
-(*          case go l of *)
-(*             (k, x, l') => (k, x, binCheckL (p, m, l', r)) *)
-(*    in *)
-(*       SOME (go t) *)
-(*    end *)
+fun viewMin t =
+   if equals (t, empty)
+      then NONE
+   else
+      let
+         fun go t =
+            case node t of
+               Nil => raise Fail "LSSWordMapFn.viewMin: invalid Nil"
+             | Tip (k, x) => (k, x, empty)
+             | Bin (p, m, l, r) =>
+                  case go l of
+                     (k, x, l') => (k, x, binCheckL (p, m, l', r))
+      in
+         SOME (go t)
+      end
 
-(* fun viewMax Nil = NONE *)
-(*   | viewMax t = *)
-(*    let *)
-(*       fun go Nil = raise Fail "WordMapFn.viewMax: invalid Nil" *)
-(*         | go (Tip (k, x)) = (k, x, Nil) *)
-(*         | go (Bin (p, m, l, r)) = *)
-(*          case go r of *)
-(*               (k, x, r') => (k, x, binCheckR (p, m, l, r')) *)
-(*    in *)
-(*       SOME (go t) *)
-(*    end *)
+fun viewMax t =
+   if equals (t, empty)
+      then NONE
+   else
+      let
+         fun go t =
+            case node t of
+               Nil => raise Fail "LSSWordMapFn.viewMax: invalid Nil"
+             | Tip (k, x) => (k, x, empty)
+             | Bin (p, m, l, r) =>
+                  case go r of
+                     (k, x, r') => (k, x, binCheckR (p, m, l, r'))
+      in
+         SOME (go t)
+      end
 
 fun findMin t = Option.map (fn (k, x, _) => (k, x)) (viewMin t)
 fun findMax t = Option.map (fn (k, x, _) => (k, x)) (viewMax t)

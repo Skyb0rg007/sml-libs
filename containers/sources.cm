@@ -2,22 +2,8 @@
 Group is
   $/basis.cm
 
-  disjoint-set.sig
-  disjoint-set.sml
-
-  (* Persistent Maps *)
-  map.sig
-  mono-map.sig
-  monomorphize-map.fun
-
-  word-map.sig
-  word-map.fun
-  word8-map.sml
-  word32-map.sml
-  word64-map.sml
-  word-map.sml
-
-  lss-word-map.sig
-  lss-word-map.fun
+  compat/sources.cm
+  disjoint-set/sources.cm
+  persistent-map/sources.cm
 
 (* vim: set tw=0 ts=2 sw=2: *)

@@ -38,6 +38,9 @@ datatype 'a map =
  *)
 fun mask (k, m) = W.andb (k, W.xorb (m, W.+ (W.notb m, W.fromInt 1)))
 
+(* Returns true if the mask bit given by `m` is zero in the key `k` *)
+fun zero (k, m) = W.same (W.andb (k, m), W.fromInt 0)
+
 (* Create a `Bin` node for the subtrees `t1` and `t2`
  * `p1` and `p2` are the common prefixes of the respective trees
  * Note: The prefixes `p1` and `p2` *must* be different
@@ -47,7 +50,7 @@ fun link (p1, t1, p2, t2) =
       val m = W.highestBitMask (W.xorb (p1, p2))
       val p = mask (p1, m)
    in
-      if W.same (W.andb (p1, m), W.fromInt 0)
+      if zero (p1, m)
          then Bin (p, m, t1, t2)
       else Bin (p, m, t2, t1)
    end
@@ -57,9 +60,6 @@ fun link (p1, t1, p2, t2) =
  * where the number of bits is decided by `m`
  *)
 fun nomatch (k, p, m) = not (W.same (mask (k, m), p))
-
-(* Returns true if the mask bit given by `m` is zero in the key `k` *)
-fun zero (k, m) = W.same (W.andb (k, m), W.fromInt 0)
 
 (* Determine which mask denotes a smaller key prefix
  * A mask is shorter if the value is larger, since we use big-endian

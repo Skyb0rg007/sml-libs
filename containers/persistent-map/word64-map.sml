@@ -1,5 +1,5 @@
 
-structure Word64 = WordMapFn(
+structure Word64Map = WordMapFn(
    struct
       open Word64
 
