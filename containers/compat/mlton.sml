@@ -8,7 +8,7 @@ signature EITHER =
       val asLeft: ('a, 'b) either -> 'a option
       val asRight: ('a, 'b) either -> 'b option
 
-      val map: ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) either -> ('c, 'd) either
+      val map: ('a -> 'c) * ('b -> 'd) -> ('a, 'b) either -> ('c, 'd) either
       val app: ('a -> unit) -> ('b -> unit) -> ('a, 'b) either -> unit
       val fold: ('a * 'c -> 'c) -> ('b * 'c -> 'c) -> 'c -> ('a, 'b) either -> 'c
       val proj: ('a, 'a) either -> 'a
@@ -35,8 +35,8 @@ structure Either: EITHER =
       fun asRight (INL _) = NONE
         | asRight (INR b) = SOME b
 
-      fun map f _ (INL a) = INL (f a)
-        | map _ g (INR b) = INR (g b)
+      fun map (f, _) (INL a) = INL (f a)
+        | map (_, g) (INR b) = INR (g b)
 
       fun app f _ (INL a) = f a
         | app _ g (INR b) = g b

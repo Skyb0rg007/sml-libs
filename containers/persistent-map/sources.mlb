@@ -14,6 +14,8 @@ local
 
    mono-map.sig
    monomorphize-map.fun
+
+   word-map-adapter.fun
 in
    signature MAP
    signature WORD_MAP
@@ -24,5 +26,8 @@ in
 
    signature MONO_MAP
    functor MonomorphizeMapFn
+
+   signature WORD_KEY
+   functor WordMapAdapterFn
 end
 (* vim: set tw=0 ts=3 sw=3: *)
