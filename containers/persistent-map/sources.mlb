@@ -15,6 +15,13 @@ local
    mono-map.sig
    monomorphize-map.fun
 
+   local
+      ../disjoint-set/sources.mlb
+   in
+      lss-word-map.sig
+      lss-word-map.fun
+   end
+
    word-map-adapter.fun
 in
    signature MAP
@@ -29,5 +36,9 @@ in
 
    signature WORD_KEY
    functor WordMapAdapterFn
+
+   signature LSS_WORD_MAP
+   signature LSS_WORD_MAP_STRUCTS
+   functor LSSWordMapFn
 end
 (* vim: set tw=0 ts=3 sw=3: *)

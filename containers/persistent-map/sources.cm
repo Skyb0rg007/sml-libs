@@ -2,45 +2,52 @@
 Library
   signature MAP
 
+  signature MONO_MAP
+  signature MONOMORPHIZE_MAP_STRUCTS
+  functor MonomorphizeMapFn
+
+  (* Word Maps *)
   signature WORD_MAP
   structure WordMap
-  structure Word8Map
-  structure Word32Map
-  structure Word64Map
 
-  signature HASH_KEY
-  functor HAMTFn
-
-  signature MONO_MAP
-  functor MonomorphizeMapFn
+  signature AUGMENTED_WORD_MAP
+  signature AUGMENTED_WORD_MAP_STRUCTS
+  functor AugmentedWordMapFn
 
   signature LSS_WORD_MAP
   signature LSS_WORD_MAP_STRUCTS
   functor LSSWordMapFn
 
-  functor WordMapAdapterFn
+  (* signature HASH_CONS_WORD_MAP_STRUCTS *)
+  (* functor HashConsWordMapFn *)
+
+  (* Hash Maps *)
+  (* signature HASHABLE_TYPE *)
+  (* functor HAMTFn *)
+
+  (* functor WeakHashConsFn *)
 is
   $/basis.cm
-  $/smlnj-lib.cm
-
+  ../util/sources.cm
   ../disjoint-set/sources.cm
+  ../seq/sources.cm
 
   map.sig
-
-  word-map.sig
-  word-map.fun
-  word-map.sml
-  word8-map.sml
-  word32-map.sml
-  word64-map.sml
-
-  word-map-adapter.fun
-
-  hamt.fun
-
   mono-map.sig
+  monomorphize-map.sig
   monomorphize-map.fun
 
-  lss-word-map.sig
-  lss-word-map.fun
-(* vim: set tw=0 ts=2 sw=2: *)
+  word-map/word-map.sig
+  word-map/word-map.sml
+  word-map/augmented-word-map.sig
+  word-map/augmented-word-map.fun
+  word-map/lss-word-map.sig
+  word-map/lss-word-map.fun
+  (* word-map/hash-cons-word-map.sig *)
+  (* word-map/hash-cons-word-map.fun *)
+  (* word-map/hash-cons.fun *)
+
+  hash-map/hashable-type.sig
+  hash-map/hamt.fun
+
+(* vim: set tw=0 ts=2 sw=2 cms=(*%s*): *)

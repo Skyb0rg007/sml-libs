@@ -1,0 +1,22 @@
+
+Library
+  signature EITHER
+  structure Either
+  signature WEAK_REFERENCE
+  structure Weak
+  structure VectorEx
+  structure WordEx
+  signature UTIL
+  structure Util
+is
+  $/basis.cm
+  $/smlnj-lib.cm
+
+  vector-extra-smlnj.sml
+  word-extra.sml
+  util.sig
+  util-smlnj.sml
+  weak.sig
+  weak-smlnj.sml
+
+(* vim: set tw=0 ts=2 sw=2: *)

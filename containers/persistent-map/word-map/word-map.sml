@@ -1,19 +1,8 @@
 
-(* Big-endian patricia tries *)
-functor WordMapFn(W:
-   sig
-      include WORD
-
-      val same: word * word -> bool
-
-      (* Returns a word with one bit set
-       * The set bit is the largest set bit in the input word
-       * On an input of 0, output is undefined *)
-      val highestBitMask: word -> word
-   end): WORD_MAP where type key = W.word =
+structure WordMap: WORD_MAP =
 struct
 
-type key = W.word
+type key = word
 
 (* Invariants:
  *
@@ -29,17 +18,17 @@ type key = W.word
 datatype 'a map =
    Nil
  | Tip of key * 'a
- | Bin of W.word * W.word * 'a map * 'a map
+ | Bin of word * word * 'a map * 'a map
 
 (* Given a bitmask `m` with one bit set (say `m = 0w1 << n`),
  * zeroes out the lower `n + 1` bits of `k`
  *
  * Ex. `mask (0wxff, 0w1 << 0w4) = 0wxe0` (zeroed out the lower 5 bits)
  *)
-fun mask (k, m) = W.andb (k, W.xorb (m, W.+ (W.notb m, W.fromInt 1)))
+fun mask (k, m) = Word.andb (k, Word.xorb (m, Word.notb m + 0w1))
 
 (* Returns true if the mask bit given by `m` is zero in the key `k` *)
-fun zero (k, m) = W.same (W.andb (k, m), W.fromInt 0)
+fun zero (k, m) = Word.andb (k, m) = 0w0
 
 (* Create a `Bin` node for the subtrees `t1` and `t2`
  * `p1` and `p2` are the common prefixes of the respective trees
@@ -47,7 +36,7 @@ fun zero (k, m) = W.same (W.andb (k, m), W.fromInt 0)
  *)
 fun link (p1, t1, p2, t2) =
    let
-      val m = W.highestBitMask (W.xorb (p1, p2))
+      val m = WordEx.highestBitMask (Word.xorb (p1, p2))
       val p = mask (p1, m)
    in
       if zero (p1, m)
@@ -59,12 +48,12 @@ fun link (p1, t1, p2, t2) =
  * Checks the upper bits of `k` against `p`,
  * where the number of bits is decided by `m`
  *)
-fun nomatch (k, p, m) = not (W.same (mask (k, m), p))
+fun nomatch (k, p, m) = mask (k, m) <> p
 
 (* Determine which mask denotes a smaller key prefix
  * A mask is shorter if the value is larger, since we use big-endian
  *)
-val shorter = W.>
+val shorter = Word.>
 
 (* Smart-constructors: check for empty subtrees *)
 fun bin (_, _, Nil, r) = r
@@ -89,7 +78,7 @@ fun insertLookupWithi f (t, k, x) =
 
       fun go Nil = (NONE, Tip (k, x))
         | go (t as Tip (k', x')) =
-         if W.same (k, k')
+         if k = k'
             then (SOME x', Tip (k, f (k, x', x)))
          else (NONE, link (k', t, k, Tip (k, x)))
         | go (t as Bin (p, m, l, r)) =
@@ -106,7 +95,7 @@ fun insertWithi f (t, k, x) =
    let
       fun go Nil = Tip (k, x)
         | go (t as Tip (k', x')) =
-         if W.same (k, k')
+         if k = k'
             then Tip (k, f (k, x', x))
          else link (k', t, k, Tip (k, x))
         | go (t as Bin (p, m, l, r)) =
@@ -139,7 +128,7 @@ fun remove (t, k) =
    let
       fun go Nil = NONE
         | go (Tip (k', x')) =
-         if W.same (k, k')
+         if k = k'
             then SOME (Nil, x')
          else NONE
         | go (Bin (p, m, l, r)) =
@@ -169,7 +158,7 @@ fun adjust f (t, k) =
    let
       fun go Nil = Nil
         | go (t as Tip (k', x')) =
-         if W.same (k, k')
+         if k = k'
             then Tip (k, f x')
          else t
         | go (t as Bin (p, m, l, r)) =
@@ -186,7 +175,7 @@ fun update f (t, k) =
    let
       fun go Nil = Nil
         | go (t as Tip (k', x')) =
-         if W.same (k, k')
+         if k = k'
             then
                case f x' of
                   NONE => Nil
@@ -206,7 +195,7 @@ fun updateLookupWithi f (t, k) =
    let
       fun go Nil = (NONE, Nil)
         | go (t as Tip (k', x')) =
-         if W.same (k, k')
+         if k = k'
             then
                case f (k, x') of
                   NONE => (SOME x', Nil)
@@ -235,7 +224,7 @@ fun alter f (t, k) =
             SOME x => Tip (k, x)
           | NONE => Nil)
         | go (t as Tip (k', x')) =
-         if W.same (k, k')
+         if k = k'
             then
                case f (SOME x') of
                   SOME y => Tip (k, y)
@@ -263,7 +252,7 @@ fun find (t, k) =
    let
       fun go Nil = NONE
         | go (Tip (k', x')) =
-         if W.same (k, k')
+         if k = k'
             then SOME x'
          else NONE
         | go (Bin (p, m, l, r)) =
@@ -317,7 +306,7 @@ fun unionWithi f =
                else if zero (p1, m2)
                   then Bin (p2, m2, go (t1, l2), r2)
                else Bin (p2, m2, l2, go (t1, r2))
-         else if W.same (p1, p2)
+         else if p1 = p2
             then Bin (p1, m1, go (l1, l2), go (r1, r2))
          else link (p1, t1, p2, t2)
    in
@@ -355,7 +344,7 @@ fun differenceWithi f =
                else if zero (p1, m2)
                   then go (t1, l2)
                else go (t1, r2)
-         else if W.same (p1, p2)
+         else if p1 = p2
             then bin (p1, m1, go (l1, l2), go (r1, r2))
          else t1
    in
@@ -401,7 +390,7 @@ fun intersectionWithi f =
                else if zero (p1, m2)
                   then go (t1, l2)
                else go (t1, r2)
-         else if W.same (p1, p2)
+         else if p1 = p2
             then bin (p1, m1, go (l1, l2), go (r1, r2))
          else Nil
    in
@@ -431,7 +420,7 @@ fun disjoint (Nil, _) = true
          else if zero (p1, m2)
             then disjoint (t1, l2)
          else disjoint (t1, r2)
-   else if W.same (p1, p2)
+   else if p1 = p2
       then disjoint (l1, l2) andalso disjoint (r1, r2)
    else true
 
@@ -625,7 +614,7 @@ fun isSubmapBy _ (Nil, _) = true
             then isSubmapBy pred (t1, l2)
          else isSubmapBy pred (t1, r2)
    else
-      W.same (p1, p2)
+      p1 = p2
       andalso isSubmapBy pred (l1, l2)
       andalso isSubmapBy pred (r1, r2)
 
@@ -637,7 +626,7 @@ fun isProperSubmapBy pred (t1, t2) =
       fun go (Nil, Nil) = EQUAL
         | go (Nil, _) = LESS
         | go (Tip (k, x), Tip (k', x')) =
-         if W.same (k, k') andalso pred (x, x')
+         if k = k' andalso pred (x, x')
             then EQUAL
          else GREATER
         | go (Tip (k, x), t) =
@@ -654,7 +643,7 @@ fun isProperSubmapBy pred (t1, t2) =
                else if zero (p1, m2)
                   then go (t1, l2)
                else go (t1, r2)
-         else if W.same (p1, m2)
+         else if p1 = m2
             then
                case go (l1, l2) of
                   GREATER => GREATER
@@ -671,11 +660,11 @@ fun isProperSubmapBy pred (t1, t2) =
 
 fun liftEquals _ (Nil, Nil) = true
   | liftEquals eq (Tip (k, x), Tip (k', x')) =
-   W.same (k, k')
+   k = k'
    andalso eq (x, x')
   | liftEquals eq (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =
-   W.same (m1, m2)
-   andalso W.same (p1, p2)
+   m1 = m2
+   andalso p1 = p2
    andalso liftEquals eq (l1, l2)
    andalso liftEquals eq (r1, r2)
   | liftEquals _ (_, _) = false
@@ -687,7 +676,7 @@ fun collate cmp (t1, t2) =
         | go ([], _ :: _) = LESS
         | go (_ :: _, []) = GREATER
         | go ((k, x) :: xs, (k', y) :: ys) =
-         case W.compare (k, k') of
+         case Word.compare (k, k') of
             EQUAL =>
                (case cmp (x, y) of
                   EQUAL => go (xs, ys)
@@ -723,156 +712,7 @@ fun viewMax Nil = NONE
       SOME (go t)
    end
 
-fun findMin t = Option.map (fn (k, x, _) => (k, x)) (viewMin t)
-fun findMax t = Option.map (fn (k, x, _) => (k, x)) (viewMax t)
-fun deleteMin t = Option.map #3 (viewMin t)
-fun deleteMax t = Option.map #3 (viewMax t)
 
-structure Fold =
-   struct
-      structure Base =
-         struct
-            datatype ('a, 'b) t =
-               NilF
-             | TipF of key * 'b
-             | BinF of 'a * 'a
-
-            fun map _ NilF = NilF
-              | map _ (TipF (k, x)) = TipF (k, x)
-              | map f (BinF (l, r)) = BinF (f l, f r)
-
-            fun project Nil = NilF
-              | project (Tip (k, x)) = TipF (k, x)
-              | project (Bin (_, _, l, r)) = BinF (l, r)
-         end
-
-      structure Cofree =
-         struct
-            infixr 5 :<
-
-            datatype ('a, 'b) t = :< of 'a * (('a, 'b) t, 'b) Base.t
-
-            fun map f (a :< b) = f a :< Base.map (map f) b
-            fun extract (a :< _) = a
-            fun unwrap (_ :< b) = b
-            fun duplicate w = w :< Base.map duplicate (unwrap w)
-            fun extend f w = f w :< Base.map (extend f) (unwrap w)
-         end
-
-      fun cata f =
-         let
-            fun go x = f (Base.map go (Base.project x))
-         in
-            go
-         end
-
-      fun para f =
-         let
-            fun go x = f (Base.map go' (Base.project x))
-            and go' x = (x, go x)
-         in
-            go
-         end
-
-      fun histo f =
-         let
-            fun dist w = Cofree.:< (Base.map Cofree.extract w, Base.map (dist o Cofree.unwrap) w)
-
-            fun go x = dist (Base.map (Cofree.duplicate o Cofree.map f o go) (Base.project x))
-         in
-            f o Cofree.extract o go
-         end
-
-      fun zygo f g =
-         let
-            fun extract (_, b) = b
-            fun duplicate (a, b) = (a, (a, b))
-            fun map f (a, b) = (a, f b)
-
-            fun dist w = (f (Base.map #1 w), Base.map extract w)
-
-            fun go x = dist (Base.map (duplicate o map g o go) (Base.project x))
-         in
-            g o extract o go
-         end
-   end
-
-(** Zipper **)
-structure Zipper =
-   struct
-      datatype 'a crumb =
-         BinL of W.word * W.word * 'a map
-       | BinR of W.word * W.word * 'a map
-
-      datatype 'a t = T of 'a map * 'a crumb list
-
-      fun focus (T (t, _)) = t
-
-      fun deleteFocus (T (_, ctx)) = T (Nil, ctx)
-
-      fun mapFocus f (T (t, ctx)) = T (map f t, ctx)
-
-      fun mapPartialFocus f (T (t, ctx)) = T (mapPartial f t, ctx)
-
-      fun filterFocus f (T (t, ctx)) = T (filter f t, ctx)
-
-      fun differenceFocus (T (t, ctx), t') = T (difference (t, t'), ctx)
-
-      fun up (T (t, BinL (p, m, l) :: ctx)) = SOME (T (binCheckR (p, m, l, t), ctx))
-        | up (T (t, BinR (p, m, r) :: ctx)) = SOME (T (binCheckL (p, m, t, r), ctx))
-        | up _ = NONE
-
-      fun downLeft (T (Bin (p, m, l, r), ctx)) = SOME (T (l, BinR (p, m, r) :: ctx))
-        | downLeft _ = NONE
-
-      fun downRight (T (Bin (p, m, l, r), ctx)) = SOME (T (r, BinL (p, m, l) :: ctx))
-        | downRight _ = NONE
-
-      fun tug f x = Option.getOpt (f x, x)
-
-      fun tugs f n x =
-         if n < 0
-            then raise Fail "WordMapFn.Zipper.tugs: Negative tug count"
-         else
-            let
-               fun go (0, x) = x
-                 | go (n, x) =
-                  case f x of
-                     NONE => x
-                   | SOME y => go (n - 1, y)
-            in
-               go (n, x)
-            end
-
-      fun furthest f =
-         let
-            fun go x =
-               case f x of
-                  NONE => x
-                | SOME y => go y
-         in
-            go
-         end
-
-      fun jerks f n x =
-         if n < 0
-            then raise Fail "WordMapFn.Zipper.jerks: Negative jerk count"
-         else
-            let
-               fun go (0, x) = SOME x
-                 | go (n, x) =
-                  case f x of
-                     NONE => NONE
-                   | SOME y => go (n - 1, y)
-            in
-               go (n, x)
-            end
-
-      fun fromMap t = T (t, [])
-
-      fun toMap (T (t, [])) = t
-        | toMap z = toMap (furthest up z)
-   end
 end
 
 (* vim: set tw=0 ts=3 sw=3: *)

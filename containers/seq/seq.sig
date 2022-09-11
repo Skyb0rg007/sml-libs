@@ -18,6 +18,7 @@ val repeat: 'a -> 'a t
 val forever: (unit -> 'a) -> 'a t
 val cycle: 'a t -> 'a t
 val iterate: ('a -> 'a) -> 'a -> 'a t
+val append: 'a t * 'a t -> 'a t
 
 (* Consuming sequences *)
 val isEmpty: 'a t -> bool

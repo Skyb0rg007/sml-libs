@@ -4,6 +4,7 @@ Library
   structure DisjointSet
 is
   $/basis.cm
+
   disjoint-set.sig
   disjoint-set.sml
 

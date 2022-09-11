@@ -9,9 +9,6 @@ struct
 
    fun make v = ref (Root (0, v))
 
-   fun isRepresentative (ref (Root _)) = true
-     | isRepresentative _ = false
-
    fun representative s =
       case !s of
          Root _ => s
@@ -23,9 +20,7 @@ struct
                ; r
             end
 
-   fun same (x: 'a t, y) = x = y orelse representative x = representative y
-
-   fun shallowEq (x: 'a t, y) = x = y
+   fun equals (x: 'a t, y) = x = y orelse representative x = representative y
 
    fun get s =
       case !(representative s) of

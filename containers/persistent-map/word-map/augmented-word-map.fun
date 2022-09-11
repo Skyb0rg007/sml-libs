@@ -1,39 +1,38 @@
 
-functor GenericWordMapFn(S: GENERIC_WORD_MAP_STRUCTS) =
+functor AugmentedWordMapFn(S: AUGMENTED_WORD_MAP_STRUCTS)
+(* : AUGMENTED_WORD_MAP = *)
+=
 struct
 
 open S
 
-type key = Word.word
+type key = word
 type value = Value.t
+type augment = Aug.t
 
 datatype node =
    Nil
  | Tip of key * value
- | Bin of prefix * mask * map * map
+ | Bin of (* prefix *) word * (* mask *) word * map * map
 
-and map = Map of node Ref.t * Aug.t
-
-withtype prefix = Word.word and mask = Word.word
+and map = Map of node * augment
 
 (* Accessors *)
 
 fun augment (Map (_, a)) = a
 
-fun nodeRef (Map (r, _)) = r
-
-fun node m = Ref.! (nodeRef m)
+fun node (Map (r, _)) = r
 
 (* Smart constructors *)
 
 val empty =
-   Map (Ref.make Nil, Aug.zero)
+   Map (Nil, Aug.zero)
 
 fun tip (k, x) =
-   Map (Ref.make (Tip (k, x)), Aug.pure (k, x))
+   Map (Tip (k, x), Aug.pure (k, x))
 
 fun bin (p, m, l, r) =
-   Map (Ref.make (Bin (p, m, l, r)), Aug.+ (augment l, augment r))
+   Map (Bin (p, m, l, r), Aug.+ (augment l, augment r))
 
 fun isEmpty t =
    case node t of
@@ -61,15 +60,13 @@ fun binCheckR (p, m, l, r) =
 
 (* The prefix of `k` from the highest bit to the set bit in `m` *)
 fun mask (k, m) =
-   Word.andb (k, Word.xorb (m, Word.+ (Word.notb m, Word.fromInt 1)))
+   Word.andb (k, Word.xorb (m, Word.notb m + 0w1))
 
 (* Does the key `k` match the prefix `p` and mask `m`? *)
-fun nomatch (k, p, m) =
-   not (Word.equals (mask (k, m), p))
+fun nomatch (k, p, m) = mask (k, m) <> p
 
 (* Returns whether the key `k` has the `m`-bit set *)
-fun zero (k, m) =
-   Word.equals (Word.andb (k, m), Word.fromInt 0)
+fun zero (k, m) = Word.andb (k, m) = 0w0
 
 (* A bitmask is shorter when the value is larger, since it's big-endian *)
 val shorter = Word.>
@@ -80,29 +77,28 @@ val shorter = Word.>
  *)
 fun link (p1, t1, p2, t2) =
    let
-      val m = Word.highestBitMask (Word.xorb (p1, p2))
+      val m = WordEx.highestBitMask (Word.xorb (p1, p2))
       val p = mask (p1, m)
    in
-      if Word.equals (Word.andb (p1, m), Word.xorb (p1, p2))
+      if Word.andb (p1, m) = Word.xorb (p1, p2)
          then bin (p, m, t1, t2)
       else bin (p, m, t2, t1)
    end
 
 (* Exports *)
-
 fun equals (m1, m2) =
    let
       fun go (t1, t2) =
          Aug.equals (augment t1, augment t2)
-         andalso Ref.liftEquals goNode (nodeRef t1, nodeRef t2)
+         andalso goNode (node t1, node t2)
 
       and goNode (Nil, Nil) = true
         | goNode (Tip (kx, x), Tip (ky, y)) =
-         Word.equals (kx, ky)
+         kx = ky
          andalso Value.equals (x, y)
         | goNode (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =
-         Word.equals (m1, m2)
-         andalso Word.equals (p1, p2)
+         m1 = m2
+         andalso p1 = p2
          andalso go (l1, l2)
          andalso go (r1, r2)
         | goNode _ = false
@@ -120,7 +116,7 @@ fun insertLookupWithi f (t, kx, x) =
          case node t of
             Nil => (NONE, new)
           | Tip (ky, y) =>
-               if Word.equals (kx, ky)
+               if kx = ky
                   then (SOME y, new)
                else (NONE, link (ky, t, kx, new))
           | Bin (p, m, l, r) =>
@@ -141,7 +137,7 @@ fun insertWithi f (t, kx, x) =
          case node t of
             Nil => new
           | Tip (ky, y) =>
-               if Word.equals (kx, ky)
+               if kx = ky
                   then new
                else link (ky, t, kx, new)
           | Bin (p, m, l, r) =>
@@ -176,7 +172,7 @@ fun remove (t, k) =
          case node t of
             Nil => NONE
           | Tip (kx, x) =>
-               if Word.equals (kx, k)
+               if kx = k
                   then SOME (empty, x)
                else NONE
           | Bin (p, m, l, r) =>
@@ -206,7 +202,7 @@ fun adjust f (t, k) =
          case node t of
             Nil => empty
           | Tip (kx, x) =>
-               if Word.equals (kx, k)
+               if kx = k
                   then tip (k, f x)
                else t
           | Bin (p, m, l, r) =>
@@ -225,7 +221,7 @@ fun update f (t, k) =
          case node t of
             Nil => t
           | Tip (kx, x) =>
-               if Word.equals (kx, k)
+               if kx = k
                   then
                      case f x of
                         NONE => empty
@@ -247,7 +243,7 @@ fun updateLookupWithi f (t, k) =
          case node t of
             Nil => (NONE, t)
           | Tip (kx, x) =>
-               if Word.equals (kx, k)
+               if kx = k
                   then
                      case f (k, x) of
                         NONE => (SOME x, empty)
@@ -284,7 +280,7 @@ fun alter f (t, k) =
          case node t of
             Nil => notFound ()
           | Tip (kx, x) =>
-               if Word.equals (kx, k)
+               if kx = k
                   then found x
                else notFoundLink (kx, t)
           | Bin (p, m, l, r) =>
@@ -305,7 +301,7 @@ fun find (t, k) =
          case node t of
             Nil => NONE
           | Tip (kx, x) =>
-               if Word.equals (kx, k)
+               if kx = k
                   then SOME x
                else NONE
           | Bin (p, m, l, r) =>
@@ -322,8 +318,6 @@ fun inDomain (t, k) = Option.isSome (find (t, k))
 
 (** Size **)
 
-fun isEmpty t = equals (t, empty)
-
 fun size t =
    let
       fun go (t, acc) =
@@ -332,7 +326,7 @@ fun size t =
           | Tip _ => acc + 1
           | Bin (_, _, l, r) => go (l, go (r, acc))
    in
-      go t
+      go (t, 0)
    end
 
 (** Union **)
@@ -342,36 +336,33 @@ fun unionWithi f =
       fun f' (k, x2, x1) = f (k, x1, x2)
 
       fun go (t1, t2) =
-         if Ref.caches andalso equals (t1, t2)
-            then t1
-         else
-            case (node t1, node t2) of
-               (Nil, _) => t2
-             | (_, Nil) => t1
-             | (Tip (k1, x1), _) => insertWithi f' (t2, k1, x1)
-             | (_, Tip (k2, x2)) => insertWithi f (t1, k2, x2)
-             | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
-                  if shorter (m1, m2)
-                     then
-                        (* t1 is possibly a subset since it has a shorter prefix *)
-                        if nomatch (p2, p1, m1)
-                           (* Subtrees are disjoint *)
-                           then link (p1, t1, p2, t2)
-                        else if zero (p2, m1)
-                           (* t1 is subset of t2, overlapping on left *)
-                           then bin (p1, m1, go (l1, t2), r1)
-                           (* t1 is subset of t2, overlapping on right *)
-                        else bin (p1, m1, l1, go (r1, t2))
-                  else if shorter (m2, m1)
-                     then
-                        if nomatch (p1, p2, m2)
-                           then link (p1, t1, p2, t2)
-                        else if zero (p1, m2)
-                           then bin (p2, m2, go (t1, l2), r2)
-                        else bin (p2, m2, l2, go (t1, r2))
-                  else if Word.equals (p1, p2)
-                     then bin (p1, m1, go (l1, l2), go (r1, r2))
-                  else link (p1, t1, p2, t2)
+         case (node t1, node t2) of
+            (Nil, _) => t2
+          | (_, Nil) => t1
+          | (Tip (k1, x1), _) => insertWithi f' (t2, k1, x1)
+          | (_, Tip (k2, x2)) => insertWithi f (t1, k2, x2)
+          | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
+               if shorter (m1, m2)
+                  then
+                     (* t1 is possibly a subset since it has a shorter prefix *)
+                     if nomatch (p2, p1, m1)
+                        (* Subtrees are disjoint *)
+                        then link (p1, t1, p2, t2)
+                     else if zero (p2, m1)
+                        (* t1 is subset of t2, overlapping on left *)
+                        then bin (p1, m1, go (l1, t2), r1)
+                        (* t1 is subset of t2, overlapping on right *)
+                     else bin (p1, m1, l1, go (r1, t2))
+               else if shorter (m2, m1)
+                  then
+                     if nomatch (p1, p2, m2)
+                        then link (p1, t1, p2, t2)
+                     else if zero (p1, m2)
+                        then bin (p2, m2, go (t1, l2), r2)
+                     else bin (p2, m2, l2, go (t1, r2))
+               else if p1 = p2
+                  then bin (p1, m1, go (l1, l2), go (r1, r2))
+               else link (p1, t1, p2, t2)
    in
       go
    end
@@ -383,38 +374,35 @@ fun unionWith f = unionWithi (fn (_, x, x') => f (x, x'))
 fun differenceWithi f =
    let
       fun go (t1, t2) =
-         if Ref.caches andalso equals (t1, t2)
-            then empty
-         else
-            case (node t1, node t2) of
-               (Nil, _) => t1
-             | (_, Nil) => t1
-             | (Tip (k1, x1), _) =>
-              (case find (t2, k1) of
-                 NONE => t1
-               | SOME x2 =>
-                    case f (k1, x1, x2) of
-                       NONE => empty
-                     | SOME x => tip (k1, x))
-             | (_, Tip (k2, x2)) => update (fn x1 => f (k2, x1, x2)) (t1, k2)
-             | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
-              if shorter (m1, m2)
-                 then
-                    if nomatch (p2, p1, m1)
-                       then t1
-                    else if zero (p2, m1)
-                       then bin (p1, m1, go (l1, t2), r1)
-                    else bin (p1, m1, l1, go (r1, t2))
-              else if shorter (m2, m1)
-                 then
-                    if nomatch (p1, p2, m2)
-                       then t1
-                    else if zero (p1, m2)
-                       then go (t1, l2)
-                    else go (t1, r2)
-              else if Word.equals (p1, p2)
-                 then bin (p1, m1, go (l1, l2), go (r1, r2))
-              else t1
+         case (node t1, node t2) of
+            (Nil, _) => t1
+          | (_, Nil) => t1
+          | (Tip (k1, x1), _) =>
+           (case find (t2, k1) of
+              NONE => t1
+            | SOME x2 =>
+                 case f (k1, x1, x2) of
+                    NONE => empty
+                  | SOME x => tip (k1, x))
+          | (_, Tip (k2, x2)) => update (fn x1 => f (k2, x1, x2)) (t1, k2)
+          | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
+           if shorter (m1, m2)
+              then
+                 if nomatch (p2, p1, m1)
+                    then t1
+                 else if zero (p2, m1)
+                    then bin (p1, m1, go (l1, t2), r1)
+                 else bin (p1, m1, l1, go (r1, t2))
+           else if shorter (m2, m1)
+              then
+                 if nomatch (p1, p2, m2)
+                    then t1
+                 else if zero (p1, m2)
+                    then go (t1, l2)
+                 else go (t1, r2)
+           else if p1 = p2
+              then bin (p1, m1, go (l1, l2), go (r1, r2))
+           else t1
    in
       go
    end
@@ -428,41 +416,38 @@ fun difference (t1, t2) = differenceWithi (fn _ => NONE) (t1, t2)
 fun intersectionWithi f =
    let
       fun go (t1, t2) =
-         if Ref.caches andalso equals (t1, t2)
-            then t1
-         else
-            case (node t1, node t2) of
-               (Nil, _) => t1
-             | (_, Nil) => t2
-             | (Tip (k1, x1), _) =>
-                  (case find (t2, k1) of
-                      NONE => empty
-                    | SOME y => tip (k1, y))
-             | (_, Tip (k2, x2)) =>
-                  (case find (t1, k2) of
-                      NONE => empty
-                    | SOME x1 =>
-                        case f (k2, x1, x2) of
-                           NONE => empty
-                         | SOME y => tip (k2, y))
-             | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
-                  if shorter (m1, m2)
-                     then
-                        if nomatch (p2, p1, m1)
-                           then empty
-                        else if zero (p2, m1)
-                           then go (l1, t2)
-                        else go (t1, t2)
-                  else if shorter (m2, m1)
-                     then
-                        if nomatch (p1, p2, m2)
-                           then empty
-                        else if zero (p1, m2)
-                           then go (t1, l2)
-                        else go (t1, r2)
-                  else if Word.equals (p1, p2)
-                     then bin (p1, m1, go (l1, l2), go (r1, r2))
-                  else empty
+         case (node t1, node t2) of
+            (Nil, _) => t1
+          | (_, Nil) => t2
+          | (Tip (k1, x1), _) =>
+               (case find (t2, k1) of
+                   NONE => empty
+                 | SOME y => tip (k1, y))
+          | (_, Tip (k2, x2)) =>
+               (case find (t1, k2) of
+                   NONE => empty
+                 | SOME x1 =>
+                     case f (k2, x1, x2) of
+                        NONE => empty
+                      | SOME y => tip (k2, y))
+          | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
+               if shorter (m1, m2)
+                  then
+                     if nomatch (p2, p1, m1)
+                        then empty
+                     else if zero (p2, m1)
+                        then go (l1, t2)
+                     else go (t1, t2)
+               else if shorter (m2, m1)
+                  then
+                     if nomatch (p1, p2, m2)
+                        then empty
+                     else if zero (p1, m2)
+                        then go (t1, l2)
+                     else go (t1, r2)
+               else if p1 = p2
+                  then bin (p1, m1, go (l1, l2), go (r1, r2))
+               else empty
    in
       go
    end
@@ -472,32 +457,29 @@ fun intersectionWith f = intersectionWithi (fn (_, x, x') => f (x, x'))
 fun intersection (t1, t2) = intersectionWithi (fn (_, x, _) => SOME x) (t1, t2)
 
 fun disjoint (t1, t2) =
-   if Ref.caches andalso equals (t1, t2)
-      then false
-   else
-      case (node t1, node t2) of
-         (Nil, _) => true
-       | (_, Nil) => true
-       | (Tip (k1, _), _) => not (inDomain (t2, k1))
-       | (_, Tip (k2, _)) => not (inDomain (t1, k2))
-       | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
-            if shorter (m1, m2)
-               then
-                  if nomatch (p2, p1, m1)
-                     then true
-                  else if zero (p2, m1)
-                     then disjoint (l1, t2)
-                  else disjoint (r1, t2)
-            else if shorter (m2, m1)
-               then
-                  if nomatch (p1, p2, m2)
-                     then true
-                  else if zero (p1, m2)
-                     then disjoint (t1, l2)
-                  else disjoint (t1, r2)
-            else if Word.equals (p1, p2)
-               then disjoint (l1, l2) andalso disjoint (r1, r2)
-            else true
+   case (node t1, node t2) of
+      (Nil, _) => true
+    | (_, Nil) => true
+    | (Tip (k1, _), _) => not (inDomain (t2, k1))
+    | (_, Tip (k2, _)) => not (inDomain (t1, k2))
+    | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
+         if shorter (m1, m2)
+            then
+               if nomatch (p2, p1, m1)
+                  then true
+               else if zero (p2, m1)
+                  then disjoint (l1, t2)
+               else disjoint (r1, t2)
+         else if shorter (m2, m1)
+            then
+               if nomatch (p1, p2, m2)
+                  then true
+               else if zero (p1, m2)
+                  then disjoint (t1, l2)
+               else disjoint (t1, r2)
+         else if p1 = p2
+            then disjoint (l1, l2) andalso disjoint (r1, r2)
+         else true
 
 (** Traversal **)
 
@@ -723,8 +705,6 @@ fun partition p = partitioni (fn (_, x) => p x)
 
 (** Submap **)
 
-fun isSubmap (t1, t2) = equals (empty, difference (t1, t2))
-
 fun isSubmapBy p =
    let
       fun go (t1, t2) =
@@ -747,12 +727,14 @@ fun isSubmapBy p =
                         then go (t1, l2)
                      else go (t1, r2)
                else
-                  Word.equals (p1, p2)
+                  p1 = p2
                   andalso go (l1, l2)
                   andalso go (r1, r2)
    in
       go
    end
+
+val isSubmap = isSubmapBy Value.equals
 
 fun isProperSubmapBy p (t1, t2) =
    let
@@ -763,7 +745,7 @@ fun isProperSubmapBy p (t1, t2) =
             (Nil, Nil) => EQ
           | (Nil, _) => SUBSET
           | (Tip (kx, x), Tip (ky, y)) =>
-               if Word.equals (kx, ky) andalso p (x, y)
+               if kx = ky andalso p (x, y)
                   then EQ
                else NOTSUBSET
           | (Tip (k, x), _) =>
@@ -782,7 +764,7 @@ fun isProperSubmapBy p (t1, t2) =
                      else if zero (p1, m2)
                         then go (t1, l2)
                      else go (t1, r2)
-               else if Word.equals (p1, m2)
+               else if p1 = m2
                   then 
                      case go (l1, l2) of
                         NOTSUBSET => NOTSUBSET
@@ -797,19 +779,16 @@ fun isProperSubmapBy p (t1, t2) =
    end
 
 fun liftEquals eq (t1, t2) =
-   if Ref.caches andalso equals (t1, t2)
-      then true
-   else
-      case (node t1, node t2) of
-         (Nil, Nil) => true
-       | (Tip (kx, x), Tip (ky, y)) =>
-            Word.equals (kx, ky) andalso eq (x, y)
-       | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
-            Word.equals (m1, m2)
-            andalso Word.equals (p1, p2)
-            andalso liftEquals eq (l1, l2)
-            andalso liftEquals eq (r1, r2)
-       | _ => false
+   case (node t1, node t2) of
+      (Nil, Nil) => true
+    | (Tip (kx, x), Tip (ky, y)) =>
+         kx = ky andalso eq (x, y)
+    | (Bin (p1, m1, l1, r1), Bin (p2, m2, l2, r2)) =>
+         m1 = m2
+         andalso p1 = p2
+         andalso liftEquals eq (l1, l2)
+         andalso liftEquals eq (r1, r2)
+    | _ => false
 
 fun collate cmp (t1, t2) =
    let
@@ -830,7 +809,7 @@ fun collate cmp (t1, t2) =
 (** WordMap specific **)
 
 fun viewMin t =
-   if equals (t, empty)
+   if isEmpty t
       then NONE
    else
       let
@@ -846,7 +825,7 @@ fun viewMin t =
       end
 
 fun viewMax t =
-   if equals (t, empty)
+   if isEmpty t
       then NONE
    else
       let
@@ -860,11 +839,6 @@ fun viewMax t =
       in
          SOME (go t)
       end
-
-fun findMin t = Option.map (fn (k, x, _) => (k, x)) (viewMin t)
-fun findMax t = Option.map (fn (k, x, _) => (k, x)) (viewMax t)
-fun deleteMin t = Option.map #3 (viewMin t)
-fun deleteMax t = Option.map #3 (viewMax t)
 
 end
 
