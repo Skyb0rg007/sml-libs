@@ -2,8 +2,6 @@
 structure VectorEx: VECTOR_EXTRA =
 struct
 
-open Vector
-
 fun create n =
    let
       val arr = Array.array (n, NONE)
