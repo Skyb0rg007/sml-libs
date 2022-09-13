@@ -1,5 +1,5 @@
 
-structure WordEx =
+structure WordEx: WORD_EXTRA =
 struct
 
 open Word
@@ -44,7 +44,7 @@ fun trailingZeros 0w0 = wordSize
    end
 
 (* This implementation is on-par with the SML/NJ library version *)
-fun popCount 0wxffffffffffff = 64
+fun popCount 0wx7fffffffffffffff = 63
   | popCount w =
    let
       infix >> andb

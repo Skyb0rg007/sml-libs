@@ -1,5 +1,5 @@
 
-structure VectorEx =
+structure VectorEx: VECTOR_EXTRA =
 struct
 
 open Vector

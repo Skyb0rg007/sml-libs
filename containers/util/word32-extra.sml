@@ -1,5 +1,5 @@
 
-structure WordEx =
+structure WordEx: WORD_EXTRA =
 struct
 
 (* Ensure that `-default-type word32` is set *)

@@ -1,5 +1,5 @@
 
-structure VectorEx =
+structure VectorEx: VECTOR_EXTRA =
 struct
 
 open Vector
@@ -7,12 +7,29 @@ open Vector
 fun create n =
    let
       val arr = Array.array (n, NONE)
+      val updateLim = ref 0
+      val gotIt = ref false
 
-      fun sub i = Option.valOf (Array.sub (arr, i))
+      fun sub i =
+         case Array.sub (arr, i) of
+            NONE => raise Subscript
+          | SOME x => x
 
-      fun done () = Vector.tabulate (n, sub)
+      fun update (i, x) =
+         if !gotIt
+            then raise Fail "cannot update after calling done"
+         else if i < !updateLim
+            then Array.update (arr, i, SOME x)
+         else if i = !updateLim andalso i < n
+            then (Array.update (arr, i, SOME x); updateLim := i + 1)
+         else raise Subscript
 
-      fun update (i, x) = Array.update (arr, i, SOME x)
+      fun done () =
+         if !gotIt
+            then raise Fail "already got vector"
+         else if n = !updateLim
+            then (gotIt := true; Vector.tabulate (n, sub))
+         else raise Fail "vector not full"
    in
       {done = done, sub = sub, update = update}
    end

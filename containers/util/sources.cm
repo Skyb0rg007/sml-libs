@@ -4,7 +4,9 @@ Library
   structure Either
   signature WEAK_REFERENCE
   structure Weak
+  signature VECTOR_EXTRA
   structure VectorEx
+  signature WORD_EXTRA
   structure WordEx
   signature UTIL
   structure Util
@@ -12,7 +14,9 @@ is
   $/basis.cm
   $/smlnj-lib.cm
 
+  vector-extra.sig
   vector-extra-smlnj.sml
+  word-extra.sig
   word63-extra.sml
   util.sig
   util-smlnj.sml
