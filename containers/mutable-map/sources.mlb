@@ -1,0 +1,17 @@
+
+local
+   $(SML_LIB)/basis/basis.mlb
+   ../util/sources.mlb
+   ../signatures/sources.mlb
+
+   table.sig
+   hash-table.sig
+   hash-table.fun
+in
+   signature TABLE
+
+   signature HASH_TABLE
+   functor HashTableFn
+end
+
+(* vim: set tw=0 ts=3 sw=3: *)

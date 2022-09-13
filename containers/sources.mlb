@@ -1,0 +1,39 @@
+
+local
+   $(SML_LIB)/basis/basis.mlb
+   util/sources.mlb
+   signatures/sources.mlb
+   disjoint-set/sources.mlb
+   seq/sources.mlb
+   persistent-map/sources.mlb
+   mutable-map/sources.mlb
+in
+   signature EITHER
+   structure Either
+
+   signature EQUATABLE_TYPE
+   signature HASHABLE_TYPE
+
+   signature DISJOINT_SET
+   structure DisjointSet
+
+   signature SEQ
+   structure Seq
+
+   signature MAP
+   signature MONO_MAP
+   signature MONOMORPHIZE_MAP_STRUCTS
+   functor MonomorphizeMapFn
+
+   signature AUGMENTED_WORD_MAP
+   signature AUGMENTED_WORD_MAP_STRUCTS
+   functor AugmentedWordMapFn
+
+   signature LSS_WORD_MAP
+   signature LSS_WORD_MAP_STRUCTS
+   functor LSSWordMapFn
+
+   functor HashTableFn
+end
+
+(* vim: set tw=0 ts=3 sw=3: *)

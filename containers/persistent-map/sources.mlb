@@ -1,41 +1,42 @@
 
 local
    $(SML_LIB)/basis/basis.mlb
-   ../compat/sources.mlb
+   ../util/sources.mlb
+   ../disjoint-set/sources.mlb
+   ../seq/sources.mlb
 
    map.sig
-
-   word-map.sig
-   word-map.fun
-   word-map.sml
-   word8-map.sml
-   word32-map.sml
-   word64-map.sml
-
    mono-map.sig
+   monomorphize-map.sig
    monomorphize-map.fun
 
-   local
-      ../disjoint-set/sources.mlb
-   in
-      lss-word-map.sig
-      lss-word-map.fun
-   end
+   word-map/word-map.sig
+   word-map/word-map.sml
+   word-map/augmented-word-map.sig
+   word-map/augmented-word-map.fun
+   word-map/lss-word-map.sig
+   word-map/lss-word-map.fun
+   (* word-map/hash-cons-word-map.sig *)
+   (* word-map/hash-cons-word-map.fun *)
+   (* word-map/hash-cons.fun *)
 
-   word-map-adapter.fun
+   hash-map/hashable-type.sig
+   ann "allowVectorExps true" in
+      hash-map/hamt.fun
+   end
 in
    signature MAP
-   signature WORD_MAP
-   structure WordMap
-   structure Word8Map
-   structure Word32Map
-   structure Word64Map
 
    signature MONO_MAP
+   signature MONOMORPHIZE_MAP_STRUCTS
    functor MonomorphizeMapFn
 
-   signature WORD_KEY
-   functor WordMapAdapterFn
+   signature WORD_MAP
+   structure WordMap
+
+   signature AUGMENTED_WORD_MAP
+   signature AUGMENTED_WORD_MAP_STRUCTS
+   functor AugmentedWordMapFn
 
    signature LSS_WORD_MAP
    signature LSS_WORD_MAP_STRUCTS

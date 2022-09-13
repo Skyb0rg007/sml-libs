@@ -24,6 +24,8 @@ Library
   signature LSS_WORD_MAP
   signature LSS_WORD_MAP_STRUCTS
   functor LSSWordMapFn
+
+  functor HashTableFn
 is
   $/basis.cm
 
@@ -32,5 +34,6 @@ is
   disjoint-set/sources.cm
   seq/sources.cm
   persistent-map/sources.cm
+  mutable-map/sources.cm
 
 (* vim: set tw=0 ts=2 sw=2 cms=(*%s*): *)

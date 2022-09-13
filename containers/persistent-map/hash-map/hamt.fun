@@ -68,7 +68,7 @@ val fullNodeMask = 0wxffffffff
 fun index (w, s) = Word.andb (Word.>> (w, s), subkeyMask)
 fun index' (w, s) = Word.toInt (index (w, s))
 fun mask (w, s) = Word.<< (0w1, index (w, s))
-fun sparseIndex (b, m) = Word.popCount (Word.andb (b, m - 0w1))
+fun sparseIndex (b, m) = WordEx.popCount (Word.andb (b, m - 0w1))
 
 (* Create a hashmap from two hash-key-value triples at the given shift level *)
 fun two (s, (h, k, x), (h', k', x')) =

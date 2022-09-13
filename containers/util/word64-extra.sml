@@ -2,12 +2,10 @@
 structure WordEx =
 struct
 
-open Word
+(* Ensure that `-default-type word64` is set *)
+val _: Word.word = 0w0 : Word64.word
 
-val () =
-   if Int.> (wordSize, 64)
-      then raise Fail "Word size is greater than 64 bits"
-   else ()
+open Word
 
 fun highestBitMask w =
    let
@@ -43,8 +41,7 @@ fun trailingZeros 0w0 = wordSize
       toInt n
    end
 
-(* This implementation is on-par with the SML/NJ library version *)
-fun popCount 0wxffffffffffff = 64
+fun popCount 0wxffffffffffffffff = 64
   | popCount w =
    let
       infix >> andb

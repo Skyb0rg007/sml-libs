@@ -2,8 +2,9 @@
 structure Util =
 struct
 
+(* This *should* be safe(?) *)
 fun ptrEq (a: 'a, b: 'a) =
-   (Unsafe.cast a : word) = Unsafe.cast b
+   (Unsafe.cast a : Word.word) = Unsafe.cast b
 
 end
 
