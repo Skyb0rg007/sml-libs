@@ -1,0 +1,14 @@
+
+Group is
+  $/basis.cm
+  $/smlnj-lib.cm
+
+  parser.sig
+  parser.sml
+
+  propagator.sig
+  propagator.sml
+
+  test.sml
+
+  test2.sml
