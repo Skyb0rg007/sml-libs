@@ -2,6 +2,15 @@
 structure Test =
 struct
 
+fun wordToReal w =
+   let
+      val arr = Word8Array.array (PackReal64Little.bytesPerElem, 0w0)
+   in
+      PackWord64Big.update (arr, 0, w);
+      PackReal64Little.subArr (arr, 0)
+   end
+(* val wordToReal = MLton.Real64.castFromWord *)
+
 fun jcsTest1 () =
    let
       val u = Byte.bytesToString o Word8Vector.fromList
@@ -54,7 +63,8 @@ fun jcsTest2 () =
    in
       if Encoding.toString input = expected
          then print "OK\n"
-      else raise Fail "jcsTest2 - canonicalization failed"
+      else (print (Encoding.toString input ^ "\n");
+            raise Fail "jcsTest2 - canonicalization failed")
    end
 
 fun jcsTest3 () =
@@ -85,24 +95,19 @@ fun jcsTest3 () =
           (0wx41b3de4355555557, "333333333.33333343", ""),
           (0wxbecbf647612f3696, "-0.0000033333333333333333", ""),
           (0wx43143ff3c1cb0959, "1424953923781206.2", "Round to even")]
-      val bytes = Word8Array.array (8, 0w0)
    in
       (* `real` matches the examples *)
       List.app
          (fn (w, expected, comment) =>
             let
-               val () = PackWord64Big.update (bytes, 0, w)
-               val r = PackReal64Little.subArr (bytes, 0)
+               val r = wordToReal w
 
                val actual = Encoding.toString (Encoding.real r)
             in
                if actual = expected
                   then ()
                else
-                  (print ("FAILED: " ^ comment ^ "\n");
-                   print ("expected: " ^ expected ^ "\n");
-                   print ("actual:   " ^ actual ^ "\n");
-                   raise Fail "jcsTest3 - canonicalization failure")
+                   raise Fail "jcsTest3 - canonicalization failure"
             end)
          tests;
       (* `real` errors out on NaN and Infinity *)
@@ -130,9 +135,7 @@ fun jcsTest4 () =
    in
       if Encoding.toString input = expected
          then print "OK\n"
-      else
-         (print (Encoding.toString input ^ "\n");
-          raise Fail "jcsTest3 - canonicalization failed")
+      else raise Fail "jcsTest3 - canonicalization failed"
    end
 
 fun jcsTest4 () =
@@ -177,6 +180,8 @@ fun testAll () =
     jcsTest3 ();
     jcsTest4 ();
     jcsTest5 ())
+
+val () = testAll ()
 
 end
 

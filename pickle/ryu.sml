@@ -7,6 +7,9 @@ val toString : Real64.real -> string
 end =
 struct
 
+val realToBits = Unsafe.realToBits
+(* val realToBits = MLton.Real64.castToWord *)
+
 (* Given 0≤a≤b≤c, returns (d, e) such that:
  * - a ≤ d ≤ c
  * - a < d*10^e < c
@@ -40,8 +43,8 @@ fun computeShortest (a, b, c, acceptSmaller, acceptLarger) =
                while IntInf.rem (!a, 10) = 0 do (
                   a := IntInf.quot (!a, 10);
                   c := IntInf.quot (!c, 10);
-                  digit := IntInf.rem (!b, 10);
                   allBZero := (!allBZero andalso !digit = 0);
+                  digit := IntInf.rem (!b, 10);
                   b := IntInf.quot (!b, 10);
                   i := !i + 1)
          else ()
@@ -64,13 +67,16 @@ fun toManExp (r : Real64.real) : {sign: bool, mantissa: IntInf.int, exponent: in
    let
       (* Step 1 - Decode the number *)
       (* Convert the floating point number into its binary representation *)
-      val bytes = PackReal64Little.toBytes r
-      val w = PackWord64Little.subVec (bytes, 0)
+      val w = realToBits r
 
       (* Extract the binary components *)
-      val sign = LargeWord.andb (w, 0wx8000000000000000) <> 0w0
-      val ieeeExponent = LargeWord.andb (LargeWord.>> (w, 0w52), 0wx7FF)
-      val ieeeMantissa = LargeWord.andb (w, 0wxFFFFFFFFFFFFF)
+      val sign = Word64.andb (w, 0wx8000000000000000) <> 0w0
+      val ieeeExponent = Word64.andb (Word64.>> (w, 0w52), 0wx7FF)
+      val ieeeMantissa = Word64.andb (w, 0wxFFFFFFFFFFFFF)
+
+      (* val () = print ("sign = " ^ Bool.toString sign ^ "\n") *)
+      (* val () = print ("ieeeExponent = 0wx" ^ Word64.toString ieeeExponent ^ "\n") *)
+      (* val () = print ("ieeeMantissa = 0wx" ^ Word64.toString ieeeMantissa ^ "\n") *)
 
       (* Check for NaN, ±Infinity, 0 *)
       val () =
@@ -85,8 +91,8 @@ fun toManExp (r : Real64.real) : {sign: bool, mantissa: IntInf.int, exponent: in
          if ieeeExponent = 0w0
             then (ieeeMantissa, ~1074)
          else
-            (LargeWord.orb (0wx10000000000000, ieeeMantissa),
-             Int32.fromLarge (LargeWord.toLargeInt ieeeExponent) - 1075)
+            (Word64.orb (0wx10000000000000, ieeeMantissa),
+             Int32.fromLarge (Word64.toLargeInt ieeeExponent) - 1075)
 
       (* Step 2 - Determine the interval of information-preserving outputs *)
       val e2 = ef - 2
@@ -101,20 +107,20 @@ fun toManExp (r : Real64.real) : {sign: bool, mantissa: IntInf.int, exponent: in
             then
                let
                   val x = Word.fromLargeInt (Int32.toLarge e2)
-                  fun f y = IntInf.<< (LargeWord.toLargeInt y, x)
+                  fun f y = IntInf.<< (Word64.toLargeInt y, x)
                in
                   (0, f u, f v, f w)
                end
          else
             let
                val x = IntInf.pow (5, Int32.toInt (~e2))
-               fun f y = LargeWord.toLargeInt y * x
+               fun f y = Word64.toLargeInt y * x
             in
                (e2, f u, f v, f w)
             end
 
       (* Step 4 - find the shortest, correctly rounded decimal representation *)
-      val even = LargeWord.andb (ieeeMantissa, 0w1) = 0w0
+      val even = Word64.andb (ieeeMantissa, 0w1) = 0w0
       val acceptSmaller = even
       val acceptLarger = even
       val (d0, e0) = computeShortest (a, b, c, acceptSmaller, acceptLarger)

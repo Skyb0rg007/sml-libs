@@ -1,0 +1,10 @@
+
+ann
+  "allowExtendedTextConsts true"
+in
+   $(SML_LIB)/basis/basis.mlb
+   $(SML_LIB)/basis/mlton.mlb
+   ryu.sml
+   encoding.sml
+   test.sml
+end
