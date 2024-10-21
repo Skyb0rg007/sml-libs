@@ -4,11 +4,9 @@ Group is
   $/smlnj-lib.cm
 
   parser.sig
-  parser.sml
+  parser.fun
 
   propagator.sig
   propagator.sml
 
   test.sml
-
-  test2.sml

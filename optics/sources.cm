@@ -1,0 +1,11 @@
+
+Group is
+    $/basis.cm
+
+    functor.sml
+    profunctors.sml
+
+    (* profunctor.sml *)
+    (* choice.sml *)
+    (* strong.sml *)
+    (* optics.sml *)

@@ -1,0 +1,5 @@
+
+$(SML_LIBS)/basis/basis.mlb
+dfa.sml
+
+(* vim: set tw=0 ts=3 sw=3: *)

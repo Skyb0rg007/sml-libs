@@ -1,39 +1,48 @@
 
-structure WeakBag :>
-sig
-   type 'a t
-   type 'a ticket
-
-   val empty: unit -> 'a t
-   val app: ('a -> unit) -> 'a t -> unit
-end =
+structure WeakBag: WEAK_BAG =
 struct
-   open SMLofNJ.Weak
-   structure M = IntRedBlackMap
 
-   datatype 'a t = WeakBag of {
+structure Weak = SMLofNJ.Weak
+
+datatype 'a t = Bag of {
       nextId: int ref,
-      children: 'a weak M.map ref
+      children: 'a Weak.weak IntRedBlackMap.map ref
    }
 
-   datatype 'a ticket = Ticket of {
-      weak: 'a weak,
-      item: 'a
-   }
+datatype 'a ticket = Ticket of {weak: 'a Weak.weak, item: 'a, cleanup: unit -> unit}
 
-   fun empty () = WeakBag {nextId = ref 1, children = ref M.empty}
+fun insert (Bag {nextId, children}, x) =
+   let
+      val id = !nextId
+      val () = nextId := id + 1
+      fun cleanup () =
+         case IntRedBlackMap.findAndRemove (!children, id) of
+            NONE => ()
+          | SOME (m, _) => children := m
+      val wa = Weak.weak x
+   in
+      children := IntRedBlackMap.insert (!children, id, wa);
+      Ticket {weak = wa, item = x, cleanup = cleanup}
+   end
 
-   fun app f (WeakBag {children, ...}) =
-      let
-         fun f' w =
-            case strong w of
-               NONE => ()
-             | SOME x => f x
-      in
-         M.app f' (!children)
-      end
+fun new () = Bag {nextId = ref 0, children = ref IntRedBlackMap.empty}
 
-   (* fun insert (WeakBag {nextId, children}, ) *)
+fun children (Bag {children, ...}) =
+   (children := IntRedBlackMap.filter (Option.isSome o Weak.strong) (!children);
+    !children)
+
+fun isEmpty b = IntRedBlackMap.isEmpty (children b)
+
+fun app f (Bag {children, ...}) =
+   children := IntRedBlackMap.filter
+      (fn w =>
+         case Weak.strong w of
+            NONE => false
+          | SOME a => (f a; true))
+      (!children)
+
+fun remove (Ticket {cleanup, ...}) = cleanup ()
+
 end
 
-(* vim: set ft=sml sw=3 ts=3 tw=0: *)
+(* vim: set tw=0 ts=3 sw=3: *)

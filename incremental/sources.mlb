@@ -1,0 +1,16 @@
+
+local
+   $(SML_LIB)/basis/basis.mlb
+   $(SML_LIB)/basis/mlton.mlb
+   dyn-array.sig
+   dyn-array.sml
+   profile-mlton.sml
+   node.sig
+   node.sml
+   frp.sig
+   frp.sml
+in
+   test.sml
+end
+
+(* vim: set ft=sml tw=0 ts=3 sw=3: *)

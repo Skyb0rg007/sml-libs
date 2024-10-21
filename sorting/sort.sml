@@ -25,6 +25,7 @@ struct
       go (List.map (fn x => Node (x, [])) xs)
     end
 
+  (* The Haskell version *)
   fun mergeSort op <= xs =
     let
       fun sequences (x :: y :: xs) =
@@ -82,6 +83,132 @@ struct
       val () = Vector.app (fn gap => loop1 (gap, gap)) gaps
     in
       Array.toList arr
+    end
+
+  structure ArrayExtras =
+    struct
+      fun swap (arr, i, j) =
+        let
+          val x = Array.sub (arr, i)
+          val y = Array.sub (arr, j)
+        in
+          Array.update (arr, i, y);
+          Array.update (arr, j, x)
+        end
+    end
+
+  structure ArraySliceExtras =
+    struct
+      fun reverse slice =
+        let
+          val n = ArraySlice.length slice
+          val lim = Int.quot (n - 2, 2)
+          val () = print ("lim = " ^ Int.toString lim ^ "\n")
+          fun loop i =
+            if i > lim
+              then ()
+              else
+                let
+                  val tmp = ArraySlice.sub (slice, i)
+                  val j = n - 1 - i
+                in
+                  ArraySlice.update (slice, i, ArraySlice.sub (slice, j));
+                  ArraySlice.update (slice, j, tmp);
+                  loop (i + 1)
+                end
+        in
+          loop 0
+        end
+    end
+
+  fun insertionSort op <= slice =
+    let
+      val len = ArraySlice.length slice
+
+      fun outer i =
+        if i >= len
+          then ()
+        else
+          let
+            val x = ArraySlice.sub (slice, i)
+            fun inner j =
+              if j < 0
+                then ArraySlice.update (slice, j + 1, x)
+              else
+                let
+                  val y = ArraySlice.sub (slice, j)
+                in
+                  if y <= x
+                    then ArraySlice.update (slice, j + 1, x)
+                  else
+                    (ArraySlice.update (slice, j + 1, y);
+                     inner (j - 1))
+                end
+          in
+            inner (i - 1);
+            outer (i + 1)
+          end
+    in
+      outer 1
+    end
+
+  fun wikiSort op <= arr =
+    let
+      fun floorPow2 w =
+        let
+          val w = Word.orb (w, Word.>> (w, 0w1))
+          val w = Word.orb (w, Word.>> (w, 0w2))
+          val w = Word.orb (w, Word.>> (w, 0w4))
+          val w = Word.orb (w, Word.>> (w, 0w8))
+          val w = Word.orb (w, Word.>> (w, 0w16))
+          val w = Word.orb (w, Word.>> (w, 0w32))
+        in
+          Word.- (w, Word.>> (w, 0w1))
+        end
+
+      fun swap (i, j) =
+        let
+          val x = Array.sub (arr, i)
+          val y = Array.sub (arr, j)
+        in
+          Array.update (arr, j, x);
+          Array.update (arr, i, y)
+        end
+
+      fun reverse (i, n) =
+        let
+          val lim = Int.quot (n - 2, 2)
+          fun loop i =
+            if i <= lim
+              then
+                let
+                  val () = print ("i = " ^ Int.toString i ^ "\n")
+                  val () = print ("lim = " ^ Int.toString lim ^ "\n")
+                  val j = n - 1 - i
+                  val tmp = Array.sub (arr, i)
+                in
+                  Array.update (arr, i, Array.sub (arr, j));
+                  Array.update (arr, j, tmp);
+                  loop (i + 1)
+                end
+              else ()
+        in
+          loop i
+        end
+
+      fun blockSwap (i, n, m) =
+        (reverse (i, n);
+         reverse (i + n, m);
+         reverse (i, m))
+
+      fun rotate (blockSize, i, n) =
+        (reverse (i, n);
+         reverse (i, blockSize);
+         reverse (i + blockSize, n - blockSize))
+    in
+      {reverse = reverse,
+       rotate = rotate,
+       swap = swap}
     end
 
   val rng = ref (Random.rand (0, 0))

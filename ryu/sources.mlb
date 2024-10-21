@@ -1,0 +1,13 @@
+
+ann
+   "warnUnused true"
+   "forceUsed"
+in
+local
+   $(SML_LIB)/basis/basis.mlb
+   tables.sml
+   ryu.sml
+in
+   structure Ryu
+end
+end

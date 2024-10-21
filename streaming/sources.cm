@@ -8,6 +8,12 @@ Library
 
     signature PUSH
     structure Push
+
+    structure Seq
+    structure ThunkExn
+    structure PullUnsafe
+    functor TestStream
+    structure Test
 is
     $/basis.cm
 
@@ -19,3 +25,9 @@ is
 
     push.sig
     push.sml
+
+    src/seq.sml
+    src/thunk-exn.sml
+    src/pull-unsafe.sml
+    src/stream.sig
+    src/test.sml

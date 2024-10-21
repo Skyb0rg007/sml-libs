@@ -4,6 +4,7 @@ Group is
     $/smlnj-lib.cm
 
     test.sml
+    test2.sml
 
     ../sources.cm
 

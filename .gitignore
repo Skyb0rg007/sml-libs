@@ -1,1 +1,12 @@
 .cm
+*.out
+*.o
+*.zip
+*.tar.gz
+*.du
+*.ud
+*.bin
+*.ps
+*.pdf
+exact-reals/ic-reals-6.3
+/abstract-bits/fast_abstract_arithmetic_artifact_final

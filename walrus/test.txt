@@ -1,0 +1,169 @@
+
+Step 1:
+
+Grammar
+
+[0] E* ::= E '$'
+[1] E ::= E '*' T
+[2] E ::= E '*' '*' T
+[3] E ::= T
+[4] T ::= T '+' F
+[5] T ::= F
+[6] F ::= '(' E ')'
+[7] F ::= 'num'
+
+LALR States
+
+State 0
+    [E* → · E]
+    on '(' shift 4
+    on 'num' shift 5
+    on E goto 1
+    on T goto 2
+    on F goto 3
+
+State 1
+    [E* → E ·], [E → E · '*' T], [E → E · '*' '*' T]
+    on '*' shift 6
+    on '$' accept
+
+State 2
+    on '*' reduce 3
+    on '+' shift 7
+    on ')' reduce 3
+    on '$' reduce 3
+
+State 3
+    on '*' reduce 5
+    on '+' reduce 5
+    on ')' reduce 5
+    on '$' reduce 5
+
+State 4
+    on '(' shift 4
+    on 'num' shift 5
+    on E goto 8
+    on T goto 2
+    on F goto 3
+
+State 5
+    on '*' reduce 7
+    on '+' reduce 7
+    on ')' reduce 7
+    on '$' reduce 7
+
+State 6
+    [E → E '*' · T], [E → E '*' · '*' T]
+    on '*' shift 10
+    on '(' shift 4
+    on 'num' shift 5
+    on T goto 9
+    on F goto 3
+
+State 7
+    on '(' shift 4
+    on 'num' shift 5
+    on F goto 11
+
+State 8
+    on '*' shift 6
+    on ')' shift 12
+
+State 9
+    on '*' reduce 1
+    on '+' shift 7
+    on ')' reduce 1
+    on '$' reduce 1
+
+State 10
+    on '(' shift 4
+    on 'num' shift 5
+    on T goto 13
+    on F goto 3
+
+State 11
+    on '*' reduce 4
+    on '+' reduce 4
+    on ')' reduce 4
+    on '$' reduce 4
+
+State 12
+    on '*' reduce 6
+    on '+' reduce 6
+    on ')' reduce 6
+    on '$' reduce 6
+
+State 13
+    on '*' reduce 2
+    on '+' shift 7
+    on ')' reduce 2
+    on '$' reduce 2
+
+
+=============================================================================
+
+Step 2:
+
+Recognition points
+
+[0] E* ::= ⬤ E '$'
+[1] E ::= E '*' ⬤ T
+[2] E ::= E '*' ⬤ '*' T
+[3] E ::= ⬤ T
+[4] T ::= T ⬤ '+' F
+[5] T ::= ⬤ F
+[6] F ::= ⬤ '(' E ')'
+[7] F ::= ⬤ 'num'
+
+Unambiguous nonterminals
+
+E, T, F are all unambigious
+
+=============================================================================
+
+Step 3:
+
+# Only consider rules with the · before the recognition point
+RADCompletion(Rule) = {R ∈ LALRCompletion(Rule) | R⁻¹[·] < R⁻¹[⬤] }
+entry(NT) = LALR state S where ∃I ∈ S st. I⁻¹[⬤] ≤ I⁻¹[·] ∧ I[I⁻¹[·]+1] = NT
+    I's dot is at or after the recognition point
+    I's dot is immediately before NT
+
+stateEEntry
+    type: entry
+    associated state: entry(E) = State 0
+    core: {[_ → · E]}
+
+    on '(' shift to State 4 of assoc(stateEEntry)
+    ->
+    on '(' announce 
+
+stateEExit
+    type: exit
+    associated state: exit(E) = State 1
+    core: completion({[_ → · E]}) + E
+        = {[_ → · E], [E → · E '*' T], [E → · E '*' '*' T], [E → · T]} + E
+        = {A → αE·β | A → α·Eβ ∈ {[_ → · E], [E → · E '*' T], [E → · E '*' '*' T], [E → · T]}}
+        = {[_ → E ·], [E → E · '*' T], [E → E '*' '*' T]}
+
+stateTEntry
+    type: entry
+    associated state: entry(T) = State 6
+    core: {[_ → · T]}
+
+stateTExit
+    type: exit
+    associated state: exit(T) = State ?
+    core: completion({[_ → · T]}) + T
+        = {[_ → T ·], [T → T · '+' F]}
+
+stateFEntry
+    type: entry
+    associated state: entry(F) = State ?
+    core: {[_ → · F]}
+
+stateFExit
+    type: exit
+    associated state: exit(F) = State ?
+    core: completion({[_ → · F]}) + F
+        = {[_ → F ·]}

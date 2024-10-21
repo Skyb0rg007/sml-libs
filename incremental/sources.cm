@@ -2,12 +2,16 @@
 Group is
   $/basis.cm
 
-  disjoint-set.sig
-  disjoint-set.sml
+  incr.sml
 
-  lazy-sharing-pair.fun
+  (* dyn-array.sig *)
+  (* dyn-array.sml *)
+  (* profile.sml *)
 
-  lazy-sharing-word-map.sig
-  lazy-sharing-word-map.fun
+  (* node.sig *)
+  (* node.sml *)
 
-(* vim: set tw=0 sw=2 ts=2: *)
+  (* frp.sig *)
+  (* frp.sml *)
+
+  (* test.sml *)

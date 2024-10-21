@@ -1,0 +1,6 @@
+
+[1] document ::= (prolog element Misc)* - (Char* RestrictedChar Char*)
+[2] Char ::= [#x1-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+[2a] RestrictedChar ::= [#x1-#x8] | [#xB-#xC] | [#xE-#x1F] | [#x7F-#x84] | [#x86-#x9F]
+[3] S ::= (#x20 | #x9 | #xD | #xA)+
+[4] NameStartChar ::= ":" | [A-Z] | "_"

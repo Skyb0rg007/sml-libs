@@ -1,0 +1,16 @@
+
+ann
+   "warnUnused true"
+   "forceUsed"
+in
+local
+   $(SML_LIB)/basis/basis.mlb
+   $(SML_LIB)/smlnj-lib/Util/smlnj-lib.mlb
+   normal.sml
+in
+   functor NormalFn
+   structure GNF
+end
+end
+
+(* vim: set tw=0 sw=3 ts=3: *)

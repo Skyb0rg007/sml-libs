@@ -1,14 +1,10 @@
 
-Library
-    structure Higher
-    signature NEWTYPE0
-    signature NEWTYPE1
-    signature NEWTYPE2
-    functor Newtype0
-    functor Newtype1
-    functor Newtype2
-    structure Test
+Group
 is
     $/basis.cm
+
+    iso.sig
+    iso.sml
+
     higher.sml
-    test.sml
+    (* test.sml *)

@@ -1,0 +1,10 @@
+
+Group is
+    $/basis.cm
+    $/smlnj-lib.cm
+
+    void.sml
+    monad.sig
+    pipes.sml
+    proxy.sig
+    proxy.fun

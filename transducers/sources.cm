@@ -1,0 +1,13 @@
+
+Group is
+  $/basis.cm
+  transducers.sml
+
+  corepresentable.sml
+  reducer.sig
+  reducer.sml
+  optics.sml
+
+  test.sml
+
+  stream.sml

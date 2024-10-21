@@ -1,0 +1,27 @@
+
+fix {
+    inlining(CFA=0CFA(opts=...))
+    cont_fold(CFA=0CFA(opts=...))
+}
+
+
+....
+
+
+while True:
+    if 0CFA not up-to-date:
+        CFA.computeWith "0CFA" 0cfa_opts
+    Inliner.run ()
+    if no changes:
+        break
+    if 0CFA in Inliner.preserved ():
+        set 0CFA to be up-to-date
+
+    if 0CFA not up-to-date:
+        CFA.computeWith "0CFA" 0cfa_opts
+    ConstFold.run ()
+    if no changes:
+        break
+    if 0CFA in ConstFold.preserved ():
+        set 0CFA to be up-to-date
+

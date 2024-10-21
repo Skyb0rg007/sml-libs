@@ -58,6 +58,8 @@ structure Option:
        * map2 _ (_, _) = TOP
        *)
       val map2: ('a * 'b -> 'c) -> 'a t * 'b t -> 'c t
+
+      val isSome: 'a t -> Bool.t
    end
 
 structure Set:

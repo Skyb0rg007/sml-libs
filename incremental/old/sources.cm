@@ -1,0 +1,13 @@
+
+Group is
+  $/basis.cm
+  $/smlnj-lib.cm
+
+  (* note.sml *)
+
+  (* frp.sml *)
+
+  (* incremental.sml *)
+
+  slf.sml
+(* vim: set tw=0 sw=2 ts=2: *)

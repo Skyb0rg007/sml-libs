@@ -2,9 +2,9 @@
 Group is
     $/basis.cm
     $/smlnj-lib.cm
+    (* note.sml *)
 
-    event-handler.sml
-    low-level.sml
-    (* types.sml *)
+    weak-bag.sig
     weak-bag.sml
-    finalizable.sml
+
+    spider.sml

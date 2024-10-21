@@ -1,0 +1,21 @@
+
+Group is
+  $/basis.cm
+  deque.sig
+  bankers-deque.sml
+  realtime-deque.sml
+
+  heap.sig
+  binomial-heap.fun
+
+  soft-heap.sig
+  soft-heap.fun
+
+  semi-array.sml
+
+  rrb.sml
+  rrb2.sml
+
+  persistent-vector.sml
+
+  persistent-array.sml

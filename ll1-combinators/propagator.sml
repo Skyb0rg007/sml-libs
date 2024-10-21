@@ -277,6 +277,25 @@ structure Option =
             cb2 := update :: !cb2;
             Cell {callbacks = cbs, value = opt}
          end
+
+      fun isSome Top = Bool.true_
+        | isSome (Some _) = Bool.true_
+        | isSome None = Bool.false_
+        | isSome (Cell {value = ref (VSOME _), ...}) = Bool.true_
+        | isSome (Cell {value = ref VTOP, ...}) = Bool.true_
+        | isSome (Cell {value = ref VNONE, callbacks}) =
+         let
+            val b = ref false
+            val cbs = ref []
+
+            fun update _ =
+               (b := true;
+                List.app (fn k => k ()) (!cbs);
+                cbs := [])
+         in
+            callbacks := update :: !callbacks;
+            Bool.Cell {value = b, callbacks = cbs}
+         end
    end
 
 structure Set =

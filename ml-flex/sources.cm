@@ -1,0 +1,7 @@
+
+Group is
+  $/basis.cm
+
+  dfa.sml
+
+(* vim: set tw=0 ts=2 sw=2: *)

@@ -5,7 +5,7 @@ signature PARSER_STRUCTS =
          sig
             type t
 
-            val compare: t * t -> order
+            val toInt: t -> int
          end
 
       structure Token:
@@ -14,34 +14,25 @@ signature PARSER_STRUCTS =
 
             val kind: t -> Kind.t
          end
-
-      structure Nonterm:
-         sig
-            type t
-
-            val + : t * t -> t
-            val token: Token.t -> t
-         end
    end
 
 signature PARSER =
    sig
       type kind
       type token
-      type nonterm
+      type 'a t
 
-      type mark = string
+      val pure: 'a -> 'a t
+      val map: ('a -> 'b) -> 'a t -> 'b t
+      val map2: ('a * 'b -> 'c) -> 'a t * 'b t -> 'c t
+      val map3: ('a * 'b * 'c -> 'd) -> 'a t * 'b t * 'c t -> 'd t
+      val empty: 'a t
+      val choice: 'a t * 'a t -> 'a t
+      val fix: ('a t -> 'a t) -> 'a t
+      val kind: kind -> token t
 
-      type syntax
-
-      val epsilon: nonterm -> syntax
-      val elem: kind -> syntax
-      val map: (nonterm -> nonterm) -> syntax -> syntax
-      val * : syntax * syntax -> syntax
-      val + : syntax * syntax -> syntax
-      val fix: (syntax -> syntax) -> syntax
-
-      val parse: syntax * token list -> nonterm option
+      val parse: 'a t * token list -> 'a option
+      (* val parse: (token, 's) StringCvt.reader -> ('a, 's) StringCvt.reader *)
    end
 
-(* vim: set tw=0 sw=3 ts=3: *)
+(* vim: set tw=0 ts=3 sw=3: *)
